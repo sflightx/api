@@ -46,13 +46,31 @@ app.post("/discord/postManifest", async (req, res) => {
       .setDescription(description)
       .setTimestamp();
 
+    // Helper to skip empty or invalid URL strings
+    const safeUrl = (val) => (val && val.trim() !== "") ? val : undefined;
+
     if (color) embed.setColor(parseInt(color.replace("#", ""), 16));
-    if (url) embed.setURL(url);
-    if (author) embed.setAuthor({ name: author, iconURL: authorIconUrl, url: authorUrl });
-    if (thumbnail) embed.setThumbnail(thumbnail);
+    if (safeUrl(url)) embed.setURL(url);
+    if (author) {
+      if (safeUrl(authorIconUrl) || safeUrl(authorUrl)) {
+        embed.setAuthor({
+          name: author,
+          iconURL: safeUrl(authorIconUrl),
+          url: safeUrl(authorUrl),
+        });
+      } else {
+        embed.setAuthor({ name: author });
+      }
+    }
+    if (safeUrl(thumbnail)) embed.setThumbnail(thumbnail);
     if (fields?.length) embed.addFields(fields);
-    if (imageUrl) embed.setImage(imageUrl);
-    if (footer) embed.setFooter({ text: footer, iconURL: footerUrl });
+    if (safeUrl(imageUrl)) embed.setImage(imageUrl);
+    if (footer) {
+      embed.setFooter({
+        text: footer,
+        iconURL: safeUrl(footerUrl),
+      });
+    }
 
     const channel = await bot.channels.fetch(CHANNEL_ID);
     if (!channel?.isTextBased()) {
@@ -65,6 +83,7 @@ app.post("/discord/postManifest", async (req, res) => {
     console.error("Embed error:", err);
     res.status(500).json({ error: "Failed to send embed." });
   }
+
 });
 
 // Start the Discord bot
