@@ -30,6 +30,9 @@ app.use(express.json());
 app.use("/manifest", express.static(path.join(__dirname, "manifest")));
 app.use("/resources", express.static(path.join(__dirname, "resources")));
 app.get("/", (_, res) => res.redirect("/manifest/index.html"));
+app.options("/discord/postManifest", cors());  // Allow preflight request for this route
+app.options("*", cors());  // Allow preflight requests for all routes
+
 
 app.post("/discord/postManifest", async (req, res) => {
   const {
