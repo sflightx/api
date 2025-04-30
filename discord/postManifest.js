@@ -9,6 +9,9 @@ const PORT = process.env.PORT || 3000;
 
 const allowedOrigins = [
   "https://sflightx.com",
+  "https://api.sflightx.com",
+  "https://app.sflightx.com",
+  "https://help.sflightx.com",
   "http://127.0.0.1:5500",
 ];
 
