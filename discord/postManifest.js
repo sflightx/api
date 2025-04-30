@@ -31,7 +31,7 @@ app.use("/manifest", express.static(path.join(__dirname, "manifest")));
 app.use("/resources", express.static(path.join(__dirname, "resources")));
 app.get("/", (_, res) => res.redirect("/manifest/index.html"));
 
-app.post("/postManifest", async (req, res) => {
+app.post("/discord/postManifest", async (req, res) => {
   const {
     color, title, url, authorIconUrl, authorUrl, author,
     description, thumbnail, fields, imageUrl, footer, footerUrl
@@ -40,6 +40,8 @@ app.post("/postManifest", async (req, res) => {
   if (!title || !description) {
     return res.status(400).json({ error: "Title and description are required." });
   }
+
+  console.log(req.body);
 
   try {
     const embed = new EmbedBuilder()
@@ -67,7 +69,6 @@ app.post("/postManifest", async (req, res) => {
     console.error("Embed error:", err);
     res.status(500).json({ error: "Failed to send embed." });
   }
-  res.send("Manifest received!");
 });
 
 const bot = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
