@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
-const { DISCORD_TOKEN, CHANNEL_ID } = require("./resources/serviceAuth/initializeDiscord");
+const { DISCORD_TOKEN, CHANNEL_ID } = require("https://sflightx.com/resources/serviceAuth/initializeDiscord");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
