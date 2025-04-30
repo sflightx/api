@@ -69,6 +69,12 @@ app.post("/postManifest", async (req, res) => {
 
 const bot = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
 bot.once("ready", () => console.log(`Bot ready as ${bot.user.tag}`));
-bot.login(DISCORD_TOKEN);
+if (!process.env.DISCORD_TOKEN) {
+  console.error("Error: DISCORD_TOKEN is not defined or is empty.");
+  process.exit(1); // Exit the process if token is missing
+} else {
+  console.log("DISCORD_TOKEN is defined, logging in...");
+  bot.login(process.env.DISCORD_TOKEN);
+}
 
 app.listen(PORT, () => console.log(`Server listening at http://localhost:${PORT}`));
