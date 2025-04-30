@@ -19,8 +19,8 @@
   },
   "homepage": "https://github.com/sflightx/api#readme",
   "dependencies": {
+    "cors": "^2.8.5",
     "discord.js": "^14.19.2",
     "express": "^5.1.0"
-  },
-  "devDependencies": {}
+  }
 }
