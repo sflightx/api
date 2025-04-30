@@ -3,6 +3,7 @@ const cors = require("cors");
 const path = require("path");
 const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
 const { DISCORD_TOKEN, CHANNEL_ID } = require("../auth/initializeDiscord.js");
+// require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
