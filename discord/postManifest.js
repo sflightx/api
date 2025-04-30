@@ -1,12 +1,12 @@
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
 const { Client, GatewayIntentBits, EmbedBuilder } = require("discord.js");
 const { DISCORD_TOKEN, CHANNEL_ID } = require("../auth/initializeDiscord.js");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Allow specific frontend origins (for CORS)
 const allowedOrigins = [
   "https://sflightx.com",
   "https://api.sflightx.com",
@@ -25,14 +25,10 @@ app.use(cors({
   }
 }));
 
-
 app.use(express.json());
-app.use("/manifest", express.static(path.join(__dirname, "manifest")));
-app.use("/resources", express.static(path.join(__dirname, "resources")));
-app.get("/", (_, res) => res.redirect("/manifest/index.html"));
-app.options("/discord/postManifest", cors());  // Allow preflight request for this route
-app.options("*", cors());  // Allow preflight requests for all routes
 
+// Preflight handling (for POST with JSON)
+app.options("/discord/postManifest", cors());
 
 app.post("/discord/postManifest", async (req, res) => {
   const {
@@ -43,8 +39,6 @@ app.post("/discord/postManifest", async (req, res) => {
   if (!title || !description) {
     return res.status(400).json({ error: "Title and description are required." });
   }
-
-  console.log(req.body);
 
   try {
     const embed = new EmbedBuilder()
@@ -67,21 +61,23 @@ app.post("/discord/postManifest", async (req, res) => {
 
     await channel.send({ embeds: [embed] });
     res.status(200).json({ success: true });
-
   } catch (err) {
     console.error("Embed error:", err);
     res.status(500).json({ error: "Failed to send embed." });
   }
 });
 
+// Start the Discord bot
 const bot = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+
 bot.once("ready", () => console.log(`Bot ready as ${bot.user.tag}`));
+
 if (!DISCORD_TOKEN) {
-  console.error("Error: DISCORD_TOKEN is not defined or is empty.");
-  process.exit(1); // Exit the process if token is missing
+  console.error("Error: DISCORD_TOKEN is not defined.");
+  process.exit(1);
 } else {
   console.log("DISCORD_TOKEN is defined, logging in...");
   bot.login(DISCORD_TOKEN);
 }
 
-app.listen(PORT, () => console.log(`Server listening at http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`Server listening on port ${PORT}`));
