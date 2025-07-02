@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { sendNotification } from "./notify/send";
+import { sendNotification } from "./notify/send.js";
 
 dotenv.config();
 
