@@ -1,19 +1,28 @@
 {
   "name": "api",
   "version": "1.0.0",
-  "description": "FCM notification and Discord relay API for sflightx.com",
+  "description": "All in one API for SFlightX's web services.",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "ts-node src/index.ts"
+    "dev": "ts-node src/index.ts",
+    "notifier": "node notifier/index.js"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/sflightx/api.git"
   },
-  "keywords": ["fcm", "discord", "api", "express", "typescript"],
+  "keywords": [
+    "fcm",
+    "discord",
+    "api",
+    "express",
+    "typescript",
+    "notifier",
+    "growagarden"
+  ],
   "author": "SFlightX",
   "license": "ISC",
   "bugs": {
@@ -26,7 +35,8 @@
     "discord.js": "^14.19.2",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "firebase-admin": "^13.4.0"
+    "firebase-admin": "^13.4.0",
+    "ws": "^8.13.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
