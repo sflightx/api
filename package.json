@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "All in one API for SFlightX's web services.",
   "main": "dist/index.js",
-  "type": "module",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
