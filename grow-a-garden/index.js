@@ -6,10 +6,10 @@ const { sendNotification } = require('../functions/sendNotification');
 const { saveToken } = require('../functions/registerToken');
 
 // Firebase Admin SDK setup
-const serviceAccount = require('./serviceAccount.json');
+const serviceAccount = require('/etc/secrets/serviceAccount.json');
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: 'https://<your-project-id>.firebaseio.com' // Replace
+  databaseURL: 'https://stock-grow-a-garden-default-rtdb.firebaseio.com/' // Replace
 });
 const db = admin.database();
 
