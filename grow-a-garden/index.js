@@ -4,6 +4,8 @@ const WebSocket = require('ws');
 const admin = require('firebase-admin');
 const { sendNotification } = require('../functions/sendNotification');
 const { saveToken } = require('../functions/registerToken');
+const fs = require('fs');
+const path = require('path');
 
 // Firebase Admin SDK setup
 const serviceAccount = require('/etc/secrets/serviceAccount.json');
@@ -85,6 +87,22 @@ router.get('/subscriptions/:fcmToken', async (req, res) => {
   }
 });
 
+router.get('/stock', (req, res) => {
+  const cachePath = path.join(__dirname, '../cache/latest-stock.json');
+  try {
+    if (!fs.existsSync(cachePath)) {
+      return res.status(200).json({});
+    }
+
+    const data = fs.readFileSync(cachePath, 'utf-8');
+    res.status(200).json(JSON.parse(data));
+  } catch (err) {
+    console.error('❌ Error reading stock cache:', err);
+    res.status(500).send('Failed to read stock cache');
+  }
+});
+
+
 
 // Dummy ping endpoint
 router.get('/ping', (req, res) => {
@@ -105,30 +123,60 @@ function connectWebSocket() {
   });
 
   ws.on('message', async (data) => {
-  console.log('📦 Stock update received:', data.toString());
+    console.log('📦 Stock update received:', data.toString());
 
-  try {
-    const { category, item } = JSON.parse(data.toString());
+    try {
+      const { category, item } = JSON.parse(data.toString());
 
-    const tokensSnapshot = await db.ref(`subscription/${category}/${item}`).once('value');
-    const tokens = tokensSnapshot.val() || {};
-    const allTokens = Object.keys(tokens);
+      const cacheDir = path.join(__dirname, '../cache');
+      if (!fs.existsSync(cacheDir)) {
+        fs.mkdirSync(cacheDir, { recursive: true });
+      }
 
-    console.log(`🔔 Notifying ${allTokens.length} users subscribed to ${category} > ${item}`);
+      // Read existing stock cache
+      const cachePath = path.join(__dirname, '../cache/latest-stock.json');
+      let stockCache = {};
+      try {
+        if (fs.existsSync(cachePath)) {
+          const file = fs.readFileSync(cachePath, 'utf-8');
+          stockCache = JSON.parse(file);
+        }
+      } catch (readErr) {
+        console.warn('⚠️ Failed to read stock cache:', readErr);
+      }
 
-    const payload = {
-      title: `🔔 ${item} restocked!`,
-      body: `Check the ${category} category now!`,
-      data: { stock: `${category}/${item}` }
-    };
+      // Update stock
+      if (!stockCache[category]) stockCache[category] = {};
+      stockCache[category][item] = {
+        timestamp: Date.now(),
+        category,
+        item
+      };
 
-    for (const token of allTokens) {
-      await sendNotification(admin, token, payload);
+      // Save to file
+      fs.writeFileSync(cachePath, JSON.stringify(stockCache, null, 2));
+      console.log('💾 Stock cache updated.');
+
+      // Notify subscribed users
+      const tokensSnapshot = await db.ref(`subscriptions/${category}/${item}`).once('value');
+      const tokens = tokensSnapshot.val() || {};
+      const allTokens = Object.keys(tokens);
+
+      console.log(`🔔 Notifying ${allTokens.length} users subscribed to ${category} > ${item}`);
+
+      const payload = {
+        title: `🔔 ${item} restocked!`,
+        body: `Check the ${category} category now!`,
+        data: { stock: `${category}/${item}` }
+      };
+
+      for (const token of allTokens) {
+        await sendNotification(admin, token, payload);
+      }
+    } catch (err) {
+      console.error('❌ Error parsing or notifying:', err);
     }
-  } catch (err) {
-    console.error('❌ Error parsing or notifying:', err);
-  }
-});
+  });
 
 
   ws.on('close', () => {
