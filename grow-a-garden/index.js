@@ -89,18 +89,28 @@ router.get('/subscriptions/:fcmToken', async (req, res) => {
 
 router.get('/stock', (req, res) => {
   const cachePath = path.join(__dirname, '../cache/latest-stock.json');
+  const categoryParam = req.query.category;
+
   try {
     if (!fs.existsSync(cachePath)) {
       return res.status(200).json({});
     }
 
     const data = fs.readFileSync(cachePath, 'utf-8');
-    res.status(200).json(JSON.parse(data));
+    const stock = JSON.parse(data);
+
+    if (categoryParam) {
+      const categoryData = stock[categoryParam];
+      return res.status(200).json(categoryData || {});
+    }
+
+    res.status(200).json(stock);
   } catch (err) {
     console.error('❌ Error reading stock cache:', err);
     res.status(500).send('Failed to read stock cache');
   }
 });
+
 
 
 
