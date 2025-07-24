@@ -132,61 +132,68 @@ function connectWebSocket() {
     console.log('✅ Grow A Garden WebSocket connected.');
   });
 
+  // WebSocket handler fix
   ws.on('message', async (data) => {
     console.log('📦 Stock update received:', data.toString());
 
     try {
-      const { category, item } = JSON.parse(data.toString());
+      const parsed = JSON.parse(data.toString());
+      const [category, items] = Object.entries(parsed)[0]; // e.g. { seed_stock: [ ... ] }
+
+      if (!category || !Array.isArray(items)) {
+        console.warn('⚠️ Invalid stock update format');
+        return;
+      }
 
       const cacheDir = path.join(__dirname, '../cache');
       if (!fs.existsSync(cacheDir)) {
         fs.mkdirSync(cacheDir, { recursive: true });
       }
 
-      // Read existing stock cache
-      const cachePath = path.join(__dirname, '../cache/latest-stock.json');
+      const cachePath = path.join(cacheDir, 'latest-stock.json');
+
       let stockCache = {};
       try {
         if (fs.existsSync(cachePath)) {
-          const file = fs.readFileSync(cachePath, 'utf-8');
-          stockCache = JSON.parse(file);
+          stockCache = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
         }
       } catch (readErr) {
-        console.warn('⚠️ Failed to read stock cache:', readErr);
+        console.warn('⚠️ Failed to read existing stock cache:', readErr);
       }
 
-      // Update stock
-      if (!stockCache[category]) stockCache[category] = {};
-      stockCache[category][item] = {
-        timestamp: Date.now(),
-        category,
-        item
-      };
+      // 🔁 Save full list per category
+      stockCache[category] = items;
 
-      // Save to file
       fs.writeFileSync(cachePath, JSON.stringify(stockCache, null, 2));
-      console.log('💾 Stock cache updated.');
+      console.log(`💾 Stock cache updated for '${category}' with ${items.length} items.`);
 
-      // Notify subscribed users
-      const tokensSnapshot = await db.ref(`subscriptions/${category}/${item}`).once('value');
-      const tokens = tokensSnapshot.val() || {};
-      const allTokens = Object.keys(tokens);
+      // 🔔 Notify users
+      const itemIds = items.map(i => i.item_id);
+      for (const itemId of itemIds) {
+        const tokensSnapshot = await db.ref(`subscriptions/${category}/${itemId}`).once('value');
+        const tokens = tokensSnapshot.val() || {};
+        const allTokens = Object.keys(tokens);
 
-      console.log(`🔔 Notifying ${allTokens.length} users subscribed to ${category} > ${item}`);
+        if (allTokens.length === 0) continue;
 
-      const payload = {
-        title: `🔔 ${item} restocked!`,
-        body: `Check the ${category} category now!`,
-        data: { stock: `${category}/${item}` }
-      };
+        console.log(`🔔 Notifying ${allTokens.length} users for ${category} > ${itemId}`);
 
-      for (const token of allTokens) {
-        await sendNotification(admin, token, payload);
+        const payload = {
+          title: `🔔 ${itemId.replace('_', ' ')} restocked!`,
+          body: `Check the ${category} category now!`,
+          data: { stock: `${category}/${itemId}` }
+        };
+
+        for (const token of allTokens) {
+          await sendNotification(admin, token, payload);
+        }
       }
+
     } catch (err) {
-      console.error('❌ Error parsing or notifying:', err);
+      console.error('❌ Error processing stock update:', err);
     }
   });
+
 
 
   ws.on('close', () => {
