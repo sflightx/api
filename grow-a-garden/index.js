@@ -15,7 +15,7 @@ const db = admin.database();
 
 // API endpoint to register token
 router.post('/registerToken', async (req, res) => {
-  const { fcmToken } = req.body;
+  const fcmToken = req.body.token;
   if (!fcmToken) return res.status(400).send('Missing FCM token');
 
   try {
