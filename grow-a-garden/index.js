@@ -27,6 +27,65 @@ router.post('/registerToken', async (req, res) => {
   }
 });
 
+// Subscribe to a list of items under a category
+router.post('/subscribe', async (req, res) => {
+  const { fcmToken, category, items } = req.body;
+
+  if (!fcmToken || !category || !Array.isArray(items)) {
+    return res.status(400).send('Missing fcmToken, category, or items array');
+  }
+
+  try {
+    const updates = {};
+    items.forEach(item => {
+      updates[`subscriptions/${fcmToken}/${category}/${item}`] = true;
+    });
+
+    await db.ref().update(updates);
+    res.status(200).send(`✅ Subscribed to ${items.join(', ')} under ${category}`);
+  } catch (error) {
+    console.error('❌ Error subscribing:', error);
+    res.status(500).send('Failed to subscribe');
+  }
+});
+
+// Unsubscribe from a list of items under a category
+router.post('/unsubscribe', async (req, res) => {
+  const { fcmToken, category, items } = req.body;
+
+  if (!fcmToken || !category || !Array.isArray(items)) {
+    return res.status(400).send('Missing fcmToken, category, or items array');
+  }
+
+  try {
+    const updates = {};
+    items.forEach(item => {
+      updates[`subscriptions/${fcmToken}/${category}/${item}`] = null;
+    });
+
+    await db.ref().update(updates);
+    res.status(200).send(`✅ Unsubscribed from ${items.join(', ')} under ${category}`);
+  } catch (error) {
+    console.error('❌ Error unsubscribing:', error);
+    res.status(500).send('Failed to unsubscribe');
+  }
+});
+
+// Get all subscriptions for a token
+router.get('/subscriptions/:fcmToken', async (req, res) => {
+  const fcmToken = req.params.fcmToken;
+
+  try {
+    const snapshot = await db.ref(`subscriptions/${fcmToken}`).once('value');
+    const data = snapshot.val() || {};
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('❌ Error fetching subscriptions:', error);
+    res.status(500).send('Failed to get subscriptions');
+  }
+});
+
+
 // Dummy ping endpoint
 router.get('/ping', (req, res) => {
   res.status(200).send('✅ Grow A Garden API is awake!');
@@ -46,27 +105,31 @@ function connectWebSocket() {
   });
 
   ws.on('message', async (data) => {
-    console.log('📦 Stock update received:', data.toString());
+  console.log('📦 Stock update received:', data.toString());
 
-    try {
-      const tokensSnapshot = await db.ref('token').once('value');
-      const tokensData = tokensSnapshot.val() || {};
-      const allTokens = Object.keys(tokensData);
+  try {
+    const { category, item } = JSON.parse(data.toString());
 
-      console.log(`🔔 Sending notifications to ${allTokens.length} devices...`);
-      const payload = {
-        title: '🌱 Grow A Garden Stock Reset!',
-        body: 'New stock is live!',
-        data: { stock: data.toString() }
-      };
+    const tokensSnapshot = await db.ref(`subscription/${category}/${item}`).once('value');
+    const tokens = tokensSnapshot.val() || {};
+    const allTokens = Object.keys(tokens);
 
-      for (const token of allTokens) {
-        await sendNotification(admin, token, payload);
-      }
-    } catch (err) {
-      console.error('❌ Error notifying users:', err);
+    console.log(`🔔 Notifying ${allTokens.length} users subscribed to ${category} > ${item}`);
+
+    const payload = {
+      title: `🔔 ${item} restocked!`,
+      body: `Check the ${category} category now!`,
+      data: { stock: `${category}/${item}` }
+    };
+
+    for (const token of allTokens) {
+      await sendNotification(admin, token, payload);
     }
-  });
+  } catch (err) {
+    console.error('❌ Error parsing or notifying:', err);
+  }
+});
+
 
   ws.on('close', () => {
     console.warn(`⚠️ WebSocket closed. Reconnecting in ${reconnectInterval / 1000}s...`);
