@@ -132,15 +132,15 @@ function connectWebSocket() {
     console.log('✅ Grow A Garden WebSocket connected.');
   });
 
-  // WebSocket handler fix
+  // inside ws.on('message')
   ws.on('message', async (data) => {
     console.log('📦 Stock update received:', data.toString());
 
     try {
       const parsed = JSON.parse(data.toString());
-      const [category, items] = Object.entries(parsed)[0]; // e.g. { seed_stock: [ ... ] }
+      const [category, itemsArray] = Object.entries(parsed)[0];
 
-      if (!category || !Array.isArray(items)) {
+      if (!category || !Array.isArray(itemsArray)) {
         console.warn('⚠️ Invalid stock update format');
         return;
       }
@@ -161,15 +161,21 @@ function connectWebSocket() {
         console.warn('⚠️ Failed to read existing stock cache:', readErr);
       }
 
-      // 🔁 Save full list per category
-      stockCache[category] = items;
+      // 🔁 Convert array to object using item_id as key
+      const transformed = {};
+      for (const item of itemsArray) {
+        if (item?.item_id) {
+          transformed[item.item_id] = item;
+        }
+      }
+
+      stockCache[category] = transformed;
 
       fs.writeFileSync(cachePath, JSON.stringify(stockCache, null, 2));
-      console.log(`💾 Stock cache updated for '${category}' with ${items.length} items.`);
+      console.log(`💾 Stock cache updated for '${category}' with ${Object.keys(transformed).length} items.`);
 
       // 🔔 Notify users
-      const itemIds = items.map(i => i.item_id);
-      for (const itemId of itemIds) {
+      for (const itemId of Object.keys(transformed)) {
         const tokensSnapshot = await db.ref(`subscriptions/${category}/${itemId}`).once('value');
         const tokens = tokensSnapshot.val() || {};
         const allTokens = Object.keys(tokens);
@@ -193,8 +199,6 @@ function connectWebSocket() {
       console.error('❌ Error processing stock update:', err);
     }
   });
-
-
 
   ws.on('close', () => {
     console.warn(`⚠️ WebSocket closed. Reconnecting in ${reconnectInterval / 1000}s...`);
