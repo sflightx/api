@@ -121,7 +121,8 @@ router.get('/ping', (req, res) => {
 
 // Grow A Garden WebSocket
 const WS_USER_ID = 'grow_notifier_backend';
-const wsUrl = `wss://websocket.joshlei.com/growagarden?user_id=${encodeURIComponent(WS_USER_ID)}`;
+const JSTUDIO_KEY = 'js_b01b4c1ef8cb9bf91a38b77b831d07ae31779f21636fecae1d1db17f0254c536';
+const wsUrl = `wss://websocket.joshlei.com/growagarden?user_id=${encodeURIComponent(WS_USER_ID)}&jstudio-key=${JSTUDIO_KEY}`;
 let ws;
 let reconnectInterval = 5000;
 
