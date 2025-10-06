@@ -8,9 +8,13 @@ app.use(express.json());
 const growAGardenRouter = require('./grow-a-garden/index');
 app.use('/grow-a-garden', growAGardenRouter);
 
-// Mount other APIs here
-// const anotherApiRouter = require('./another-api/index');
-// app.use('/another-api', anotherApiRouter);
+const discordRouter = require('./discord/index');
+app.use('/discord', discordRouter);
+
+const appRouter = require('./app/index');
+app.use('/app', appRouter);
+
+//----------------------//----------------------//
 
 // Root health check
 app.get('/', (req, res) => {
