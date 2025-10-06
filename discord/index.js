@@ -2,7 +2,7 @@ import express from "express";
 const router = express.Router();
 
 router.get("/", (req, res) => {
-  res.send("Hello from /app");
+  res.send("Hello from Discord API");
 });
 
-module.exports = router;
+export default router;
