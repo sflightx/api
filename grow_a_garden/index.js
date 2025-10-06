@@ -121,7 +121,8 @@ router.get('/ping', (req, res) => {
 
 // Grow A Garden WebSocket
 const WS_USER_ID = 'grow_notifier_backend';
-const wsUrl = `wss://websocket.joshlei.com/growagarden?user_id=${encodeURIComponent(WS_USER_ID)}`;
+const JSTUDIO_KEY = 'js_b01b4c1ef8cb9bf91a38b77b831d07ae31779f21636fecae1d1db17f0254c536';
+const wsUrl = `wss://websocket.joshlei.com/growagarden?user_id=${encodeURIComponent(WS_USER_ID)}&jstudio-key=${JSTUDIO_KEY}`;
 let ws;
 let reconnectInterval = 5000;
 
@@ -134,71 +135,76 @@ function connectWebSocket() {
 
   // inside ws.on('message')
   ws.on('message', async (data) => {
-    console.log('📦 Stock update received:', data.toString());
+  console.log('📦 Raw stock update received:\n', data.toString());
 
-    try {
-      const parsed = JSON.parse(data.toString());
-      const [category, itemsArray] = Object.entries(parsed)[0];
+  try {
+    const parsed = JSON.parse(data.toString());
+    const [category, itemsArray] = Object.entries(parsed)[0];
 
-      if (!category || !Array.isArray(itemsArray)) {
-        console.warn('⚠️ Invalid stock update format');
-        return;
-      }
-
-      const cacheDir = path.join(__dirname, '../cache');
-      if (!fs.existsSync(cacheDir)) {
-        fs.mkdirSync(cacheDir, { recursive: true });
-      }
-
-      const cachePath = path.join(cacheDir, 'latest-stock.json');
-
-      let stockCache = {};
-      try {
-        if (fs.existsSync(cachePath)) {
-          stockCache = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
-        }
-      } catch (readErr) {
-        console.warn('⚠️ Failed to read existing stock cache:', readErr);
-      }
-
-      // 🔁 Convert array to object using item_id as key
-      const transformed = {};
-      for (const item of itemsArray) {
-        if (item?.item_id) {
-          transformed[item.item_id] = item;
-        }
-      }
-
-      stockCache[category] = transformed;
-
-      fs.writeFileSync(cachePath, JSON.stringify(stockCache, null, 2));
-      console.log(`💾 Stock cache updated for '${category}' with ${Object.keys(transformed).length} items.`);
-
-      // 🔔 Notify users
-      for (const itemId of Object.keys(transformed)) {
-        const tokensSnapshot = await db.ref(`subscriptions/${category}/${itemId}`).once('value');
-        const tokens = tokensSnapshot.val() || {};
-        const allTokens = Object.keys(tokens);
-
-        if (allTokens.length === 0) continue;
-
-        console.log(`🔔 Notifying ${allTokens.length} users for ${category} > ${itemId}`);
-
-        const payload = {
-          title: `🔔 ${itemId.replace('_', ' ')} restocked!`,
-          body: `Check the ${category} category now!`,
-          data: { stock: `${category}/${itemId}` }
-        };
-
-        for (const token of allTokens) {
-          await sendNotification(admin, token, payload);
-        }
-      }
-
-    } catch (err) {
-      console.error('❌ Error processing stock update:', err);
+    if (!category || !Array.isArray(itemsArray)) {
+      console.warn('⚠️ Invalid stock update format');
+      return;
     }
-  });
+
+    const cacheDir = path.join(__dirname, '../cache');
+    if (!fs.existsSync(cacheDir)) {
+      fs.mkdirSync(cacheDir, { recursive: true });
+    }
+
+    const cachePath = path.join(cacheDir, 'latest-stock.json');
+
+    let stockCache = {};
+    try {
+      if (fs.existsSync(cachePath)) {
+        stockCache = JSON.parse(fs.readFileSync(cachePath, 'utf-8'));
+      }
+    } catch (readErr) {
+      console.warn('⚠️ Failed to read existing stock cache:', readErr);
+    }
+
+    // 🔁 Convert array to object using item_id as key
+    const transformed = {};
+    for (const item of itemsArray) {
+      if (item?.item_id) {
+        transformed[item.item_id] = item;
+      }
+    }
+
+    console.log(`🆕 Parsed new items for category '${category}':`, transformed);
+
+    stockCache[category] = transformed;
+
+    fs.writeFileSync(cachePath, JSON.stringify(stockCache, null, 2));
+    console.log(`💾 Stock cache updated for '${category}' with ${Object.keys(transformed).length} items.`);
+
+    // 📂 Log final saved JSON
+    console.log('🗂 Final saved stock cache:\n', JSON.stringify(stockCache, null, 2));
+
+    // 🔔 Notify users
+    for (const itemId of Object.keys(transformed)) {
+      const tokensSnapshot = await db.ref(`subscriptions/${category}/${itemId}`).once('value');
+      const tokens = tokensSnapshot.val() || {};
+      const allTokens = Object.keys(tokens);
+
+      if (allTokens.length === 0) continue;
+
+      console.log(`🔔 Notifying ${allTokens.length} users for ${category} > ${itemId}`);
+
+      const payload = {
+        title: `🔔 ${itemId.replace('_', ' ')} restocked!`,
+        body: `Check the ${category} category now!`,
+        data: { stock: `${category}/${itemId}` }
+      };
+
+      for (const token of allTokens) {
+        await sendNotification(admin, token, payload);
+      }
+    }
+
+  } catch (err) {
+    console.error('❌ Error processing stock update:', err);
+  }
+});
 
   ws.on('close', () => {
     console.warn(`⚠️ WebSocket closed. Reconnecting in ${reconnectInterval / 1000}s...`);
