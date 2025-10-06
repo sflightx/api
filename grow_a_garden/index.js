@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const WebSocket = require('ws');
 const admin = require('firebase-admin');
-const { sendNotification } = require('sendNotification');
-const { saveToken } = require('registerToken');
+const { sendNotification } = require('../grow_a_garden/sendNotification');
+const { saveToken } = require('../grow_a_garden/registerToken');
 const fs = require('fs');
 const path = require('path');
 
