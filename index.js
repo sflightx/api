@@ -5,8 +5,8 @@ const app = express();
 app.use(express.json());
 
 // Mount Grow A Garden API
-const growAGardenRouter = require('./grow-a-garden/index');
-app.use('/grow-a-garden', growAGardenRouter);
+const growAGardenRouter = require('./grow_a_garden/index');
+app.use('/grow_a_garden', growAGardenRouter);
 
 const discordRouter = require('./discord/index');
 app.use('/discord', discordRouter);
