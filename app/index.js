@@ -9,7 +9,7 @@ if (!admin.apps.length) {
   });
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount.default),
-    databaseURL: "https://stock-grow-a-garden-default-rtdb.firebaseio.com/",
+    databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/",
   });
 }
 
