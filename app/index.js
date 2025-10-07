@@ -52,9 +52,14 @@ router.get("/search", async (req, res) => {
     });
 
     // 🔍 Search results
-    const searchResults = Object.entries(allBlueprints)
-      .filter(([_, d]) => (d.name || "").toLowerCase().includes(query))
-      .map(([id, d]) => normalize(id, d));
+    // --- 🔍 SEARCH RESULTS ---
+    const searchResults = [];
+    for (const [id, data] of Object.entries(allBlueprints)) {
+      if ((data.search || "").toLowerCase().includes(query)) {
+        searchResults.push(normalize(id, data));
+      }
+    }
+
 
     // 👥 Personalized results
     let personalizedResults = [];
