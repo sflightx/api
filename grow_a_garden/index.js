@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 // Firebase Admin SDK setup
-import serviceAccount from "/etc/secrets/serviceAccount.json" assert { type: "json" };
+const serviceAccount = require('/etc/secrets/serviceAccount.json');
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
