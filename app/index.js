@@ -4,7 +4,7 @@ import { getDatabase } from "firebase-admin/database";
 
 // Ensure Firebase is initialized once
 if (!admin.apps.length) {
-  const serviceAccount = await import("/etc/secrets/serviceAccount.json", {
+  const serviceAccount = await import("/etc/secrets/serviceAccount_sflightx.json", {
     assert: { type: "json" },
   });
   admin.initializeApp({
