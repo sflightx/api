@@ -1,4 +1,4 @@
-async function sendNotification(admin, token, payload) {
+export async function sendNotification(admin, token, payload) {
   try {
     await admin.messaging().send({
       token,
@@ -21,5 +21,3 @@ async function removeInvalidToken(db, token) {
   await db.ref(`token/${token}`).remove();
   console.log(`🗑 Removed invalid token: ${token}`);
 }
-
-module.exports = { sendNotification };
