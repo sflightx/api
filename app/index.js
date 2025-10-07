@@ -26,9 +26,35 @@ if (!admin.apps.some((a) => a.name === "sflightxApp")) {
 const db = getDatabase(sflightxApp);
 const router = express.Router();
 
-/**
- * GET /app/search?q=starship&uid=12345&limit=25
- */
+router.get("/:postKey", async (req, res) => {
+  const postKey = req.params.postKey;
+
+  try {
+    // Fetch all data in parallel
+    const [dataSnap, commentsSnap, likesSnap, dislikesSnap] = await Promise.all([
+      db.ref(`upload/blueprint/${postKey}`).get(),
+      db.ref(`comment/upload/blueprint/${postKey}`).get(),
+      db.ref(`upload/likes/${postKey}`).get(),
+      db.ref(`upload/dislikes/${postKey}`).get(),
+    ]);
+
+    const blueprintData = dataSnap.exists() ? dataSnap.val() : null;
+    const comments = commentsSnap.exists() ? Object.values(commentsSnap.val()) : [];
+    const likes = likesSnap.exists() ? Object.keys(likesSnap.val()) : [];
+    const dislikes = dislikesSnap.exists() ? Object.keys(dislikesSnap.val()) : [];
+
+    res.json({
+      data: blueprintData,
+      comments,
+      likes,
+      dislikes,
+    });
+  } catch (error) {
+    console.error("Blueprint details API Error:", error);
+    res.status(500).json({ error: "Failed to fetch blueprint details" });
+  }
+});
+
 router.get("/search", async (req, res) => {
   try {
     const query = (typeof req.query.q === "string" ? req.query.q : "").trim().toLowerCase();
