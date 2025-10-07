@@ -33,6 +33,7 @@ router.get("/search", async (req, res) => {
     const snapshot = await ref.get();
 
     if (!snapshot.exists()) {
+      console.log("No blueprints found in database.");
       return res.json({ query, results: { search: [], personalized: [], trending: [], recent: [] } });
     }
 
@@ -52,14 +53,27 @@ router.get("/search", async (req, res) => {
     });
 
     // 🔍 Search results
-    // --- 🔍 SEARCH RESULTS ---
     const searchResults = [];
     for (const [id, data] of Object.entries(allBlueprints)) {
-      if ((data.search || "").toLowerCase().includes(query)) {
+      const name = data.name || "";
+      const desc = data.desc || "";
+      const searchField = data.search || "";
+
+      const combined = `${name} ${desc} ${searchField}`.toLowerCase();
+      const isMatch = combined.includes(query);
+
+      console.log(`[DEBUG] Checking blueprint ID: ${id}`);
+      console.log(`       Name: "${name}"`);
+      console.log(`       Desc: "${desc}"`);
+      console.log(`       Search field: "${searchField}"`);
+      console.log(`       Match: ${isMatch}`);
+
+      if (isMatch) {
         searchResults.push(normalize(id, data));
       }
     }
 
+    console.log(`[DEBUG] Total search results: ${searchResults.length}`);
 
     // 👥 Personalized results
     let personalizedResults = [];
