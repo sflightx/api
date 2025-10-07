@@ -1,17 +1,20 @@
 import express from "express";
 import admin from "firebase-admin";
 import { getDatabase } from "firebase-admin/database";
+import fs from "fs";
+
+// Load JSON manually instead of dynamic `import()`
+const sflightxServiceAccount = JSON.parse(
+  fs.readFileSync("/etc/secrets/serviceAccount_sflightx.json", "utf-8")
+);
 
 let sflightxApp;
 
-// Ensure Firebase is initialized once
-if (!admin.apps.some(a => a.name === "sflightxApp")) {
-  const sflightxServiceAccount = await import("/etc/secrets/serviceAccount_sflightx.json", {
-    assert: { type: "json" },
-  });
+// Initialize named Firebase app if not exists
+if (!admin.apps.some((a) => a.name === "sflightxApp")) {
   sflightxApp = admin.initializeApp(
     {
-      credential: admin.credential.cert(sflightxServiceAccount.default),
+      credential: admin.credential.cert(sflightxServiceAccount),
       databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/",
     },
     "sflightxApp"
