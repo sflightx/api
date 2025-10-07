@@ -2,18 +2,25 @@ import express from "express";
 import admin from "firebase-admin";
 import { getDatabase } from "firebase-admin/database";
 
+let sflightxApp;
+
 // Ensure Firebase is initialized once
-if (!admin.apps.length) {
+if (!admin.apps.some(a => a.name === "sflightxApp")) {
   const sflightxServiceAccount = await import("/etc/secrets/serviceAccount_sflightx.json", {
     assert: { type: "json" },
   });
-  admin.initializeApp({
-    credential: admin.credential.cert(sflightxServiceAccount.default),
-    databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/",
-  });
+  sflightxApp = admin.initializeApp(
+    {
+      credential: admin.credential.cert(sflightxServiceAccount.default),
+      databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/",
+    },
+    "sflightxApp"
+  );
+} else {
+  sflightxApp = admin.app("sflightxApp");
 }
 
-const db = getDatabase();
+const db = getDatabase(sflightxApp);
 const router = express.Router();
 
 /**
