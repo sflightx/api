@@ -1,16 +1,14 @@
-const express = require("express");
-const app = express();
+import express from "express";
+import growAGardenRouter from "./grow_a_garden/index.js";
+import discordRouter from "./discord/index.js";
+import appRouter from "./app/index.js";
 
+const app = express();
 app.use(express.json());
 
 // Routers
-const growAGardenRouter = require("./grow_a_garden/index");
 app.use("/grow_a_garden", growAGardenRouter);
-
-const discordRouter = require("./discord/index");
 app.use("/discord", discordRouter);
-
-const appRouter = require("./app/index");
 app.use("/app", appRouter);
 
 // Health check
