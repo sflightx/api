@@ -4,11 +4,11 @@ import { getDatabase } from "firebase-admin/database";
 
 // Ensure Firebase is initialized once
 if (!admin.apps.length) {
-  const serviceAccount = await import("/etc/secrets/serviceAccount_sflightx.json", {
+  const sflightxServiceAccount = await import("/etc/secrets/serviceAccount_sflightx.json", {
     assert: { type: "json" },
   });
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount.default),
+    credential: admin.credential.cert(sflightxServiceAccount.default),
     databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/",
   });
 }
