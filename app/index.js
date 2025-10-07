@@ -32,6 +32,10 @@ router.get("/search", async (req, res) => {
     const ref = db.ref("upload/blueprint");
     const snapshot = await ref.get();
 
+    const rootSnap = await db.ref().get();
+    console.log("Root keys in database:", Object.keys(rootSnap.val() || {}));
+
+
     if (!snapshot.exists()) {
       console.log("No blueprints found in database.");
       return res.json({ query, results: { search: [], personalized: [], trending: [], recent: [] } });
