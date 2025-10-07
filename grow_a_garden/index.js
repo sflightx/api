@@ -218,4 +218,4 @@ function connectWebSocket() {
 
 connectWebSocket();
 
-module.exports = router;
+export default router;

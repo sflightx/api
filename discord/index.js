@@ -5,4 +5,4 @@ router.get("/", (req, res) => {
   res.json({ message: "🤖 Discord API online!" });
 });
 
-module.exports = router;
+export default router;
