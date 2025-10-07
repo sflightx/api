@@ -26,7 +26,7 @@ if (!admin.apps.some((a) => a.name === "sflightxApp")) {
 const db = getDatabase(sflightxApp);
 const router = express.Router();
 
-router.get("/:postKey", async (req, res) => {
+router.get("/blueprint/:postKey", async (req, res) => {
   const postKey = req.params.postKey;
 
   try {
