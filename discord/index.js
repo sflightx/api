@@ -1,9 +1,8 @@
-import express from "express";
-
+const express = require("express");
 const router = express.Router();
 
 router.get("/", (req, res) => {
-  res.send("Hello from Discord API");
+  res.json({ message: "🤖 Discord API online!" });
 });
 
-export default router;
+module.exports = router;

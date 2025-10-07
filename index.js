@@ -1,25 +1,22 @@
-import express from "express";
-import growAGardenRouter from "./grow_a_garden/index.js";
-import discordRouter from "./discord/index.js";
-import appRouter from "./app/index.js";
-
+const express = require("express");
 const app = express();
 
-// Middlewares
 app.use(express.json());
 
-// Mount sub-routes
+// Routers
+const growAGardenRouter = require("./grow_a_garden/index");
 app.use("/grow_a_garden", growAGardenRouter);
+
+const discordRouter = require("./discord/index");
 app.use("/discord", discordRouter);
+
+const appRouter = require("./app/index");
 app.use("/app", appRouter);
 
-// Root health check
+// Health check
 app.get("/", (req, res) => {
   res.send("✅ API root: api.sflightx.com");
 });
 
-// Start server
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`🌐 API server running at http://localhost:${PORT}`);
-});
+app.listen(PORT, () => console.log(`🌐 API server running at http://localhost:${PORT}`));
