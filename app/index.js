@@ -1,8 +1,20 @@
 import express from "express";
+import admin from "firebase-admin";
 import { getDatabase } from "firebase-admin/database";
 
-const router = express.Router();
+// Ensure Firebase is initialized once
+if (!admin.apps.length) {
+  const serviceAccount = await import("/etc/secrets/serviceAccount.json", {
+    assert: { type: "json" },
+  });
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount.default),
+    databaseURL: "https://stock-grow-a-garden-default-rtdb.firebaseio.com/",
+  });
+}
+
 const db = getDatabase();
+const router = express.Router();
 
 /**
  * GET /app/search?q=starship&uid=12345&limit=25
@@ -39,47 +51,39 @@ router.get("/search", async (req, res) => {
       key: data.key || "",
     });
 
-    // --- 🔍 SEARCH RESULTS ---
-    const searchResults = [];
-    for (const [id, data] of Object.entries(allBlueprints)) {
-      if ((data.name || "").toLowerCase().includes(query)) {
-        searchResults.push(normalize(id, data));
-      }
-    }
+    // 🔍 Search results
+    const searchResults = Object.entries(allBlueprints)
+      .filter(([_, d]) => (d.name || "").toLowerCase().includes(query))
+      .map(([id, d]) => normalize(id, d));
 
-    // --- 👥 PERSONALIZED (from followed authors) ---
+    // 👥 Personalized results
     let personalizedResults = [];
     if (uid) {
       try {
-        const followRef = db.ref(`userdata/${uid}/following`);
-        const followSnap = await followRef.get();
-
+        const followSnap = await db.ref(`userdata/${uid}/following`).get();
         if (followSnap.exists()) {
           const followedIds = Object.keys(followSnap.val());
-          for (const [id, data] of Object.entries(allBlueprints)) {
-            if (followedIds.includes(data.authorId)) {
-              personalizedResults.push(normalize(id, data));
-            }
-          }
+          personalizedResults = Object.entries(allBlueprints)
+            .filter(([_, d]) => followedIds.includes(d.authorId))
+            .map(([id, d]) => normalize(id, d));
         }
-      } catch (err) {
-        console.warn("Personalization skipped:", err);
+      } catch (e) {
+        console.warn("Personalization skipped:", e);
       }
     }
 
-    // --- 🔥 TRENDING (based on likes + downloads) ---
+    // 🔥 Trending
     const trending = Object.entries(allBlueprints)
-      .map(([id, data]) => normalize(id, data))
+      .map(([id, d]) => normalize(id, d))
       .sort((a, b) => (b.like + b.downloads) - (a.like + a.downloads))
       .slice(0, 10);
 
-    // --- 🕓 RECENT (latest uploads) ---
+    // 🕓 Recent
     const recent = Object.entries(allBlueprints)
-      .map(([id, data]) => normalize(id, data))
+      .map(([id, d]) => normalize(id, d))
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 10);
 
-    // --- 📦 FINAL RESPONSE ---
     res.json({
       query,
       total: searchResults.length,
@@ -90,11 +94,10 @@ router.get("/search", async (req, res) => {
         recent,
       },
     });
-
   } catch (error) {
     console.error("Search API Error:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-module.exports = router;
+export default router;

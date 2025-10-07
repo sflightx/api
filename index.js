@@ -1,24 +1,21 @@
-const express = require('express');
+import express from "express";
+import growAGardenRouter from "./grow_a_garden/index.js";
+import discordRouter from "./discord/index.js";
+import appRouter from "./app/index.js";
+
 const app = express();
 
 // Middlewares
 app.use(express.json());
 
-// Mount Grow A Garden API
-const growAGardenRouter = require('./grow_a_garden/index');
-app.use('/grow_a_garden', growAGardenRouter);
-
-const discordRouter = require('./discord/index');
-app.use('/discord', discordRouter);
-
-const appRouter = require('./app/index');
-app.use('/app', appRouter);
-
-//----------------------//----------------------//
+// Mount sub-routes
+app.use("/grow_a_garden", growAGardenRouter);
+app.use("/discord", discordRouter);
+app.use("/app", appRouter);
 
 // Root health check
-app.get('/', (req, res) => {
-  res.send('✅ API root: api.sflightx.com');
+app.get("/", (req, res) => {
+  res.send("✅ API root: api.sflightx.com");
 });
 
 // Start server
