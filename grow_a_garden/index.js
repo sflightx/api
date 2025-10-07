@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Firebase Admin SDK setup
-import serviceAccount from "/etc/secrets/serviceAccount.json" assert { type: "json" };
+const serviceAccount = JSON.parse(fs.readFileSync("/etc/secrets/serviceAccount.json", "utf-8"));
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
