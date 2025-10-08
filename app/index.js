@@ -194,7 +194,7 @@ router.delete("/blueprint/:postKey", async (req, res) => {
     }
 
     const blueprintData = blueprintSnap.val();
-    const authorId = blueprintData.authorId;
+    const authorId = blueprintData.author;
     const imageUrl = blueprintData.image_url;
 
     console.log("Blueprint authorId:", authorId);
