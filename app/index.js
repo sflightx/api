@@ -182,7 +182,7 @@ router.delete("/blueprint/:postKey", async (req, res) => {
 
   try {
     // Verify the Firebase Auth token
-    const decoded = await admin.auth().verifyIdToken(idToken);
+    const decoded = await sflightxApp.auth().verifyIdToken(idToken);
     const requestUid = decoded.uid;
 
     // Fetch blueprint data
