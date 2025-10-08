@@ -197,6 +197,10 @@ router.delete("/blueprint/:postKey", async (req, res) => {
     const authorId = blueprintData.authorId;
     const imageUrl = blueprintData.image_url;
 
+    console.log("Blueprint authorId:", authorId);
+    console.log("Request user UID:", requestUid);
+
+
     // 🔒 Check ownership
     if (authorId !== requestUid) {
       return res.status(403).json({ error: "Forbidden: You do not own this blueprint" });
