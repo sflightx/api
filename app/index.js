@@ -170,6 +170,8 @@ router.get("/search", async (req, res) => {
    ============================================================ */
 router.delete("/blueprint/:postKey", async (req, res) => {
   const postKey = req.params.postKey;
+  console.log("🔍 DELETE request for postKey:", req.params.postKey);
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
