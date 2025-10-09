@@ -27,6 +27,45 @@ const db = getDatabase(sflightxApp);
 const router = express.Router();
 
 /**
+ * GET /app/user/:uid/
+ * Returns the user's data
+ */
+
+router.get("/:uid", async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const includeCompany = req.query.includeCompany === "true";
+
+    const userSnap = await db.ref(`userdata/${uid}`).get();
+    if (!userSnap.exists()) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const userData = userSnap.val();
+
+    const response = { uid, ...userData };
+
+    if (includeCompany && userData.companyId) {
+      const companySnap = await db
+        .ref(`static/company/${userData.companyId}`)
+        .get();
+
+      if (companySnap.exists()) {
+        response.company = companySnap.val();
+      } else {
+        response.company = null;
+      }
+    }
+
+    res.json(response);
+  } catch (err) {
+    console.error("Error fetching user:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+
+/**
  * GET /app/user/:uid/verified
  * Returns the user's verification status (true/false)
  */
