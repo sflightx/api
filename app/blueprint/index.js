@@ -24,6 +24,7 @@ if (!admin.apps.some((a) => a.name === "sflightxApp")) {
 }
 
 const db = getDatabase(sflightxApp);
+const router = express.Router();
 
 router.get("/:postKey", async (req, res) => {
   const postKey = req.params.postKey;
@@ -134,5 +135,4 @@ router.delete("/:postKey", async (req, res) => {
     res.status(500).json({ error: "Failed to delete blueprint" });
   }
 });
-
-const router = express.Router();
+export default router;
