@@ -1,8 +1,11 @@
 import admin from "firebase-admin";
-import { getDatabase, ref, get, set, update } from "firebase/database";
 
 const db = admin.database();
 
+/**
+ * Migrates user upload data from old array format to new map format.
+ * @param {string} uid - The user's Firebase UID.
+ */
 export async function migrateUserUpload(uid) {
   if (!uid) throw new Error("Missing UID");
 
@@ -19,7 +22,6 @@ export async function migrateUserUpload(uid) {
   // Check if it's still in the old format (array)
   if (Array.isArray(value)) {
     const newMap = {};
-
     for (const item of value) {
       if (typeof item === "string") {
         newMap[item] = true;
@@ -30,9 +32,7 @@ export async function migrateUserUpload(uid) {
     await uploadRef.set(newMap);
 
     // ✅ Add migration flag
-    await db
-      .ref(`userdata/${uid}/settings/migration/upload`)
-      .set(true);
+    await db.ref(`userdata/${uid}/settings/migration/upload`).set(true);
 
     console.log(`✅ Migration completed for user: ${uid}`);
   } else {
@@ -48,11 +48,11 @@ export async function migrateUserUpload(uid) {
  * @param {string} uid - The user's Firebase UID.
  * @param {object} userData - The user data from Firebase Auth or your app.
  * @param {string} latestVersion - The latest app or profile version string.
- * @returns {Promise<void>}
  */
 export async function completeProfileDetails(uid, userData, latestVersion) {
-  const db = getDatabase();
-  const userRef = ref(db, `userdata/${uid}`);
+  if (!uid) throw new Error("Missing UID");
+
+  const userRef = db.ref(`userdata/${uid}`);
 
   const updates = {
     profile: userData.photoUrl || null,
@@ -63,14 +63,14 @@ export async function completeProfileDetails(uid, userData, latestVersion) {
   };
 
   try {
-    const snapshot = await get(userRef);
+    const snapshot = await userRef.get();
     if (!snapshot.exists()) {
       // Create new profile
-      await set(userRef, updates);
+      await userRef.set(updates);
       console.log(`[API] Created new user profile for UID: ${uid}`);
     } else {
       // Update existing profile
-      await update(userRef, updates);
+      await userRef.update(updates);
       console.log(`[API] Updated user profile for UID: ${uid}`);
     }
   } catch (err) {
