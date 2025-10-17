@@ -134,7 +134,7 @@ router.post("/:uid/updateProfile", verifyToken, async (req, res) => {
 
     // ✅ Gather user data (from request or decoded token)
     const userData = {
-      username: req.user.username || req.body.username,
+      username: req.user.displayName || req.body.username,
       profile: req.user.profile || req.body.profile,
     };
 

@@ -5,6 +5,7 @@ import discordRouter from "./discord/index.js";
 import appRouter from "./app/index.js";
 import appUserRouter from "./app/user/index.js";
 import appBlueprintRouter from "./app/blueprint/index.js";
+import appNotificationRouter from "./app/notification/index.js";
 
 
 const app = express();
@@ -17,6 +18,7 @@ app.use("/discord", discordRouter);
 app.use("/app", appRouter);
 app.use("/app/user", appUserRouter);
 app.use("/app/blueprint", appBlueprintRouter);
+app.use("/app/notification", appNotificationRouter);
 
 // Health check
 app.get("/", (req, res) => {
