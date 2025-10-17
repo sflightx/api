@@ -8,17 +8,25 @@ const sflightxServiceAccount = JSON.parse(
 
 let sflightxApp;
 if (!admin.apps.some(a => a.name === "sflightxApp")) {
-  sflightxApp = admin.initializeApp({
-    credential: admin.credential.cert(sflightxServiceAccount),
-    databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/"
-  }, "sflightxApp");
+  sflightxApp = admin.initializeApp(
+    {
+      credential: admin.credential.cert(sflightxServiceAccount),
+      databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/"
+    },
+    "sflightxApp"
+  );
 } else {
   sflightxApp = admin.app("sflightxApp");
 }
 
 const router = express.Router();
 
-// Helper: create & store notification in database
+// 🧩 Debug logger
+function logDebug(...args) {
+  console.log("[DEBUG]", ...args);
+}
+
+// 🧩 Helper: create & store notification
 async function createNotification({
   receiverId,
   senderId,
@@ -32,9 +40,12 @@ async function createNotification({
 
   const isReaction = type === "LIKE" || type === "DISLIKE";
 
+  const refBase = sflightxApp
+    .database()
+    .ref(`notification/user/${receiverId}`);
   const notificationId = isReaction
     ? `${postId || "none"}_REACTION_${senderId}`
-    : admin.database().ref(`notification/user/${receiverId}`).push().key;
+    : refBase.push().key;
 
   const notification = {
     id: notificationId,
@@ -47,13 +58,14 @@ async function createNotification({
     isRead: false
   };
 
-  const ref = admin.database().ref(`notification/user/${receiverId}/${notificationId}`);
+  const ref = sflightxApp
+    .database()
+    .ref(`notification/user/${receiverId}/${notificationId}`);
 
   if (isReaction) {
     const snapshot = await ref.get();
     const alreadyExists = snapshot.exists();
     await ref.set(notification);
-
     return alreadyExists ? null : notification;
   } else {
     await ref.set(notification);
@@ -61,15 +73,24 @@ async function createNotification({
   }
 }
 
-// Helper: log utility
-function logDebug(...args) {
-  console.log("[DEBUG]", ...args);
-}
-
-// Send to single user
+// 📨 Send to single user
 router.post("/send", async (req, res) => {
   try {
-    const { receiverId, senderId, type, key, postId, commentId, extraMessage, title, body, imageUrl, groupTag, sendAt } = req.body;
+    const {
+      receiverId,
+      senderId,
+      type,
+      key,
+      postId,
+      commentId,
+      extraMessage,
+      title,
+      body,
+      imageUrl,
+      groupTag,
+      sendAt
+    } = req.body;
+
     logDebug("Incoming /send request:", req.body);
 
     // 1️⃣ Store notification in DB
@@ -85,11 +106,17 @@ router.post("/send", async (req, res) => {
 
     if (!notification) {
       logDebug("Notification already exists or invalid for receiver:", receiverId);
-      return res.json({ success: true, message: "Notification already exists or invalid" });
+      return res.json({
+        success: true,
+        message: "Notification already exists or invalid"
+      });
     }
 
-    // 2️⃣ Fetch device token
-    const tokenSnap = await admin.database().ref(`userdata/${receiverId}/fcm_token`).get();
+    // 2️⃣ Fetch device token (FIXED TEMPLATE LITERAL)
+    const tokenSnap = await sflightxApp
+      .database()
+      .ref(`userdata/${receiverId}/fcm_token`)
+      .get();
     const token = tokenSnap.val();
     logDebug("Device token fetched:", token);
 
@@ -106,18 +133,27 @@ router.post("/send", async (req, res) => {
         key: key || "",
         title: title || extraMessage || "SFlightX Notification",
         body: body || extraMessage || "",
-        imageUrl: imageUrl || "https://api.sflightx.com/assets/default_notification.png"
+        imageUrl:
+          imageUrl || "https://api.sflightx.com/assets/default_notification.png"
       },
       android: groupTag ? { notification: { tag: groupTag } } : undefined
     };
     logDebug("FCM message prepared:", message);
 
-    // 4️⃣ Send immediately or schedule
+    // 4️⃣ Send or schedule
     if (sendAt) {
       const delay = new Date(sendAt).getTime() - Date.now();
       if (delay > 0) {
         logDebug(`Scheduling notification in ${delay}ms`);
-        setTimeout(() => sflightxApp.messaging().send(message).then(r => logDebug("Scheduled FCM sent:", r)).catch(e => logDebug("Scheduled FCM error:", e)), delay);
+        setTimeout(
+          () =>
+            sflightxApp
+              .messaging()
+              .send(message)
+              .then(r => logDebug("Scheduled FCM sent:", r))
+              .catch(e => logDebug("Scheduled FCM error:", e)),
+          delay
+        );
         return res.json({ success: true, scheduled: true });
       }
     }
@@ -126,17 +162,29 @@ router.post("/send", async (req, res) => {
     logDebug("FCM sent successfully:", response);
 
     res.json({ success: true, response });
-
   } catch (err) {
     console.error("[ERROR] Failed to send notification:", err);
-    res.status(500).json({ error: "Failed to send notification", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Failed to send notification", details: err.message });
   }
 });
 
-// Broadcast route with debug
+// 🛰 Broadcast to multiple users
 router.post("/broadcast", async (req, res) => {
   try {
-    const { userIds, senderId, type, key, postId, commentId, extraMessage, title, body } = req.body;
+    const {
+      userIds,
+      senderId,
+      type,
+      key,
+      postId,
+      commentId,
+      extraMessage,
+      title,
+      body
+    } = req.body;
+
     logDebug("Incoming /broadcast request:", req.body);
 
     if (!Array.isArray(userIds)) {
@@ -160,7 +208,10 @@ router.post("/broadcast", async (req, res) => {
 
       if (notification) notifications.push(notification);
 
-      const snap = await admin.database().ref(`userdata/${receiverId}/fcm_token`).get();
+      const snap = await sflightxApp
+        .database()
+        .ref(`userdata/${receiverId}/fcm_token`)
+        .get();
       const token = snap.val();
       logDebug("Device token fetched for", receiverId, ":", token);
 
@@ -186,11 +237,16 @@ router.post("/broadcast", async (req, res) => {
     const response = await sflightxApp.messaging().sendMulticast(message);
     logDebug("FCM multicast sent successfully:", response);
 
-    res.json({ success: true, response, notificationsStored: notifications.length });
-
+    res.json({
+      success: true,
+      response,
+      notificationsStored: notifications.length
+    });
   } catch (err) {
     console.error("[ERROR] Broadcast failed:", err);
-    res.status(500).json({ error: "Broadcast failed", details: err.message });
+    res
+      .status(500)
+      .json({ error: "Broadcast failed", details: err.message });
   }
 });
 
