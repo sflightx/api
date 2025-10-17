@@ -1,7 +1,7 @@
 import express from "express";
 import admin from "firebase-admin";
 import { getDatabase } from "firebase-admin/database";
-import { migrateUserUpload } from "./../../task/profileUpdateTask.js";
+import { migrateUserUpload, completeProfileDetails } from "./../../task/profileUpdateTask.js";
 import fs from "fs";
 
 // Load JSON manually instead of dynamic `import()`
@@ -111,33 +111,43 @@ router.get("/:uid/verified", async (req, res) => {
 });
 
 /**
- * POST /profile/:uid/updateProfile
- * Securely updates the user's profile version to the latest,
- * only if the token's UID matches the URL param.
+ * POST /app/user/:uid/updateProfile
+ * Update user profile details
  */
 router.post("/:uid/updateProfile", verifyToken, async (req, res) => {
   const { uid } = req.params;
 
-  // Ensure the caller is the same as the target UID
+  // ✅ Ensure token UID matches the target UID
   if (req.user.uid !== uid) {
     return res.status(403).json({
       success: false,
-      error: "Unauthorized: You can only update your own profile"
+      error: "Unauthorized: You can only update your own profile",
     });
   }
 
   try {
-    const latestSnap = await db.ref("app/profile/version").get();
-    const latestVersion = latestSnap.val();
+    const db = getDatabase();
 
-    await db.ref(`userdata/${uid}/profile_version`).set(latestVersion);
+    // ✅ Get latest profile version
+    const versionSnap = await get(ref(db, "app/profile/version"));
+    const latestVersion = versionSnap.val() || "unknown";
 
+    // ✅ Gather user data (from request or decoded token)
+    const userData = {
+      username: req.user.username || req.body.username,
+      profile: req.user.profile || req.body.profile,
+    };
+
+    // ✅ Ensure profile exists and is updated
+    await completeProfileDetails(uid, userData, latestVersion);
+
+    // ✅ Optionally migrate user uploads
     await migrateUserUpload(uid);
 
     res.json({
       success: true,
       message: "Profile updated successfully",
-      version: latestVersion
+      version: latestVersion,
     });
   } catch (error) {
     console.error("Profile update failed:", error);
