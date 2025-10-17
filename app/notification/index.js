@@ -26,37 +26,6 @@ function logDebug(...args) {
   console.log("[DEBUG]", ...args);
 }
 
-// 🧩 Helper: choose title/body dynamically
-function getNotificationContent(type, extraMessage) {
-  switch (type) {
-    case "COMMENT":
-      return {
-        title: "New Comment",
-        body: extraMessage || "Someone commented on your post."
-      };
-    case "LIKE":
-      return {
-        title: "New Like",
-        body: "Someone liked your blueprint."
-      };
-    case "DISLIKE":
-      return {
-        title: "Reaction Update",
-        body: "Someone disliked your blueprint."
-      };
-    case "FOLLOW":
-      return {
-        title: "New Follower",
-        body: "Someone started following you!"
-      };
-    default:
-      return {
-        title: "SFlightX Notification",
-        body: extraMessage || "You have a new notification."
-      };
-  }
-}
-
 // 🧩 Helper: create & store notification
 async function createNotification({
   receiverId,
@@ -154,9 +123,6 @@ router.post("/send", async (req, res) => {
       return res.status(404).json({ error: "User has no device token" });
     }
 
-    // 3️⃣ Dynamic notification content
-    const { title: notifTitle, body: notifBody } = getNotificationContent(type, extraMessage);
-
     // 4️⃣ Build FCM message (with both `notification` + `data`)
     const message = {
       token,
@@ -171,8 +137,6 @@ router.post("/send", async (req, res) => {
         postId: postId || "",
         commentId: commentId || "",
         senderId: senderId || "",
-        title: title || notifTitle,
-        body: body || notifBody,
         imageUrl: imageUrl || "",
       },
       android: {
