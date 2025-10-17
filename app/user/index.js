@@ -1,6 +1,7 @@
 import express from "express";
 import admin from "firebase-admin";
 import { getDatabase } from "firebase-admin/database";
+import { migrateUserUpload } from "./../../task/profileUpdateTask.js";
 import fs from "fs";
 
 // Load JSON manually instead of dynamic `import()`
@@ -25,6 +26,25 @@ if (!admin.apps.some((a) => a.name === "sflightxApp")) {
 
 const db = getDatabase(sflightxApp);
 const router = express.Router();
+
+async function verifyToken(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ success: false, error: "Missing or invalid Authorization header" });
+  }
+
+  const token = authHeader.split("Bearer ")[1];
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.user = decoded; // contains uid, email, etc.
+    next();
+  } catch (error) {
+    console.error("Token verification failed:", error);
+    return res.status(401).json({ success: false, error: "Invalid token" });
+  }
+}
 
 /**
  * GET /app/user/:uid/
@@ -87,6 +107,41 @@ router.get("/:uid/verified", async (req, res) => {
   } catch (error) {
     console.error("Error fetching verification status:", error);
     return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+/**
+ * POST /profile/:uid/updateProfile
+ * Securely updates the user's profile version to the latest,
+ * only if the token's UID matches the URL param.
+ */
+router.post("/:uid/updateProfile", verifyToken, async (req, res) => {
+  const { uid } = req.params;
+
+  // Ensure the caller is the same as the target UID
+  if (req.user.uid !== uid) {
+    return res.status(403).json({
+      success: false,
+      error: "Unauthorized: You can only update your own profile"
+    });
+  }
+
+  try {
+    const latestSnap = await db.ref("app/profile/version").get();
+    const latestVersion = latestSnap.val();
+
+    await db.ref(`userdata/${uid}/profile_version`).set(latestVersion);
+
+    await migrateUserUpload(uid);
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      version: latestVersion
+    });
+  } catch (error) {
+    console.error("Profile update failed:", error);
+    res.status(500).json({ success: false, error: "Server error" });
   }
 });
 
