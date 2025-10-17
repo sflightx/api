@@ -26,6 +26,37 @@ function logDebug(...args) {
   console.log("[DEBUG]", ...args);
 }
 
+// 🧩 Helper: choose title/body dynamically
+function getNotificationContent(type, extraMessage) {
+  switch (type) {
+    case "COMMENT":
+      return {
+        title: "New Comment",
+        body: extraMessage || "Someone commented on your post."
+      };
+    case "LIKE":
+      return {
+        title: "New Like",
+        body: "Someone liked your blueprint."
+      };
+    case "DISLIKE":
+      return {
+        title: "Reaction Update",
+        body: "Someone disliked your blueprint."
+      };
+    case "FOLLOW":
+      return {
+        title: "New Follower",
+        body: "Someone started following you!"
+      };
+    default:
+      return {
+        title: "SFlightX Notification",
+        body: extraMessage || "You have a new notification."
+      };
+  }
+}
+
 // 🧩 Helper: create & store notification
 async function createNotification({
   receiverId,
@@ -40,9 +71,7 @@ async function createNotification({
 
   const isReaction = type === "LIKE" || type === "DISLIKE";
 
-  const refBase = sflightxApp
-    .database()
-    .ref(`notification/user/${receiverId}`);
+  const refBase = sflightxApp.database().ref(`notification/user/${receiverId}`);
   const notificationId = isReaction
     ? `${postId || "none"}_REACTION_${senderId}`
     : refBase.push().key;
@@ -112,7 +141,7 @@ router.post("/send", async (req, res) => {
       });
     }
 
-    // 2️⃣ Fetch device token (FIXED TEMPLATE LITERAL)
+    // 2️⃣ Fetch device token
     const tokenSnap = await sflightxApp
       .database()
       .ref(`userdata/${receiverId}/fcm_token`)
@@ -125,22 +154,41 @@ router.post("/send", async (req, res) => {
       return res.status(404).json({ error: "User has no device token" });
     }
 
-    // 3️⃣ Build FCM message
+    // 3️⃣ Dynamic notification content
+    const { title: notifTitle, body: notifBody } = getNotificationContent(type, extraMessage);
+
+    // 4️⃣ Build FCM message (with both `notification` + `data`)
     const message = {
       token,
+      notification: {
+        title: title || notifTitle,
+        body: body || notifBody,
+        image: imageUrl || undefined
+      },
       data: {
         type: type || "generic",
         key: key || "",
-        title: title || extraMessage || "SFlightX Notification",
-        body: body || extraMessage || "",
-        imageUrl:
-          imageUrl || "https://api.sflightx.com/assets/default_notification.png"
+        postId: postId || "",
+        commentId: commentId || "",
+        senderId: senderId || "",
+        title: title || notifTitle,
+        body: body || notifBody,
+        imageUrl: imageUrl || "",
       },
-      android: groupTag ? { notification: { tag: groupTag } } : undefined
+      android: {
+        priority: "high",
+        notification: {
+          icon: "ic_notification",
+          color: "#4285F4",
+          channelId: "default",
+          tag: groupTag || undefined
+        }
+      }
     };
+
     logDebug("FCM message prepared:", message);
 
-    // 4️⃣ Send or schedule
+    // 5️⃣ Send immediately or schedule
     if (sendAt) {
       const delay = new Date(sendAt).getTime() - Date.now();
       if (delay > 0) {
@@ -167,86 +215,6 @@ router.post("/send", async (req, res) => {
     res
       .status(500)
       .json({ error: "Failed to send notification", details: err.message });
-  }
-});
-
-// 🛰 Broadcast to multiple users
-router.post("/broadcast", async (req, res) => {
-  try {
-    const {
-      userIds,
-      senderId,
-      type,
-      key,
-      postId,
-      commentId,
-      extraMessage,
-      title,
-      body
-    } = req.body;
-
-    logDebug("Incoming /broadcast request:", req.body);
-
-    if (!Array.isArray(userIds)) {
-      logDebug("Invalid userIds array");
-      return res.status(400).json({ error: "userIds must be an array" });
-    }
-
-    const tokens = [];
-    const notifications = [];
-
-    for (const receiverId of userIds) {
-      const notification = await createNotification({
-        receiverId,
-        senderId,
-        type,
-        postId,
-        commentId,
-        extraMessage
-      });
-      logDebug("Notification stored for", receiverId, ":", notification);
-
-      if (notification) notifications.push(notification);
-
-      const snap = await sflightxApp
-        .database()
-        .ref(`userdata/${receiverId}/fcm_token`)
-        .get();
-      const token = snap.val();
-      logDebug("Device token fetched for", receiverId, ":", token);
-
-      if (token) tokens.push(token);
-    }
-
-    if (tokens.length === 0) {
-      logDebug("No valid device tokens found");
-      return res.status(404).json({ error: "No valid tokens found" });
-    }
-
-    const message = {
-      tokens,
-      data: {
-        type: type || "generic",
-        key: key || "",
-        title: title || extraMessage || "SFlightX Notification",
-        body: body || extraMessage || ""
-      }
-    };
-    logDebug("FCM multicast message prepared:", message);
-
-    const response = await sflightxApp.messaging().sendMulticast(message);
-    logDebug("FCM multicast sent successfully:", response);
-
-    res.json({
-      success: true,
-      response,
-      notificationsStored: notifications.length
-    });
-  } catch (err) {
-    console.error("[ERROR] Broadcast failed:", err);
-    res
-      .status(500)
-      .json({ error: "Broadcast failed", details: err.message });
   }
 });
 
