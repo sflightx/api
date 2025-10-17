@@ -51,6 +51,11 @@ function getNotificationContent(type, extraMessage, senderName) {
         title: "New Follower",
         body: `${displayName} started following you!`
       };
+    case "POST":
+      return {
+        title: "New Post",
+        body: `${displayName} posted ${extraMessage || "a new update."}`
+      };
     default:
       return {
         title: "SFlightX Notification",
