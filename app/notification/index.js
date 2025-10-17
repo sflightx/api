@@ -79,7 +79,7 @@ router.post("/send", async (req, res) => {
     if (!notification) return res.json({ success: true, message: "Notification already exists or invalid" });
 
     // 2️⃣ Send FCM
-    const tokenSnap = await admin.database().ref(`userdata/${receiverId}/deviceToken`).get();
+    const tokenSnap = await admin.database().ref(`userdata/${receiverId}/fcm_token`).get();
     const token = tokenSnap.val();
     if (!token) return res.status(404).json({ error: "User has no device token" });
 
@@ -134,7 +134,7 @@ router.post("/broadcast", async (req, res) => {
       if (notification) notifications.push(notification);
 
       // 2️⃣ Collect device tokens
-      const snap = await admin.database().ref(`userdata/${receiverId}/deviceToken`).get();
+      const snap = await admin.database().ref(`userdata/${receiverId}/fcm_token`).get();
       const token = snap.val();
       if (token) tokens.push(token);
     }
