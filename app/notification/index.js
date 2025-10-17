@@ -61,10 +61,16 @@ async function createNotification({
   }
 }
 
+// Helper: log utility
+function logDebug(...args) {
+  console.log("[DEBUG]", ...args);
+}
+
 // Send to single user
 router.post("/send", async (req, res) => {
   try {
     const { receiverId, senderId, type, key, postId, commentId, extraMessage, title, body, imageUrl, groupTag, sendAt } = req.body;
+    logDebug("Incoming /send request:", req.body);
 
     // 1️⃣ Store notification in DB
     const notification = await createNotification({
@@ -75,14 +81,24 @@ router.post("/send", async (req, res) => {
       commentId,
       extraMessage
     });
+    logDebug("Notification stored in DB:", notification);
 
-    if (!notification) return res.json({ success: true, message: "Notification already exists or invalid" });
+    if (!notification) {
+      logDebug("Notification already exists or invalid for receiver:", receiverId);
+      return res.json({ success: true, message: "Notification already exists or invalid" });
+    }
 
-    // 2️⃣ Send FCM
+    // 2️⃣ Fetch device token
     const tokenSnap = await admin.database().ref(`userdata/${receiverId}/fcm_token`).get();
     const token = tokenSnap.val();
-    if (!token) return res.status(404).json({ error: "User has no device token" });
+    logDebug("Device token fetched:", token);
 
+    if (!token) {
+      logDebug("No device token found for receiver:", receiverId);
+      return res.status(404).json({ error: "User has no device token" });
+    }
+
+    // 3️⃣ Build FCM message
     const message = {
       token,
       data: {
@@ -94,34 +110,44 @@ router.post("/send", async (req, res) => {
       },
       android: groupTag ? { notification: { tag: groupTag } } : undefined
     };
+    logDebug("FCM message prepared:", message);
 
+    // 4️⃣ Send immediately or schedule
     if (sendAt) {
       const delay = new Date(sendAt).getTime() - Date.now();
       if (delay > 0) {
-        setTimeout(() => sflightxApp.messaging().send(message), delay);
+        logDebug(`Scheduling notification in ${delay}ms`);
+        setTimeout(() => sflightxApp.messaging().send(message).then(r => logDebug("Scheduled FCM sent:", r)).catch(e => logDebug("Scheduled FCM error:", e)), delay);
         return res.json({ success: true, scheduled: true });
       }
     }
 
     const response = await sflightxApp.messaging().send(message);
+    logDebug("FCM sent successfully:", response);
+
     res.json({ success: true, response });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to send notification" });
+    console.error("[ERROR] Failed to send notification:", err);
+    res.status(500).json({ error: "Failed to send notification", details: err.message });
   }
 });
 
-// Broadcast to multiple users
+// Broadcast route with debug
 router.post("/broadcast", async (req, res) => {
   try {
     const { userIds, senderId, type, key, postId, commentId, extraMessage, title, body } = req.body;
-    if (!Array.isArray(userIds)) return res.status(400).json({ error: "userIds must be an array" });
+    logDebug("Incoming /broadcast request:", req.body);
+
+    if (!Array.isArray(userIds)) {
+      logDebug("Invalid userIds array");
+      return res.status(400).json({ error: "userIds must be an array" });
+    }
 
     const tokens = [];
     const notifications = [];
 
     for (const receiverId of userIds) {
-      // 1️⃣ Store notification
       const notification = await createNotification({
         receiverId,
         senderId,
@@ -130,18 +156,22 @@ router.post("/broadcast", async (req, res) => {
         commentId,
         extraMessage
       });
+      logDebug("Notification stored for", receiverId, ":", notification);
 
       if (notification) notifications.push(notification);
 
-      // 2️⃣ Collect device tokens
       const snap = await admin.database().ref(`userdata/${receiverId}/fcm_token`).get();
       const token = snap.val();
+      logDebug("Device token fetched for", receiverId, ":", token);
+
       if (token) tokens.push(token);
     }
 
-    if (tokens.length === 0) return res.status(404).json({ error: "No valid tokens found" });
+    if (tokens.length === 0) {
+      logDebug("No valid device tokens found");
+      return res.status(404).json({ error: "No valid tokens found" });
+    }
 
-    // 3️⃣ Send FCM multicast
     const message = {
       tokens,
       data: {
@@ -151,12 +181,16 @@ router.post("/broadcast", async (req, res) => {
         body: body || extraMessage || ""
       }
     };
+    logDebug("FCM multicast message prepared:", message);
 
     const response = await sflightxApp.messaging().sendMulticast(message);
+    logDebug("FCM multicast sent successfully:", response);
+
     res.json({ success: true, response, notificationsStored: notifications.length });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Broadcast failed" });
+    console.error("[ERROR] Broadcast failed:", err);
+    res.status(500).json({ error: "Broadcast failed", details: err.message });
   }
 });
 
