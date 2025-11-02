@@ -1,4 +1,6 @@
 import express from "express";
+import cors from "cors";
+
 import growAGardenRouter from "./grow_a_garden/index.js";
 import discordRouter from "./discord/index.js";
 
@@ -10,6 +12,13 @@ import appNotificationRouter from "./app/notification/index.js";
 
 const app = express();
 app.use(express.json());
+
+app.use(cors({
+  origin: ["http://127.0.0.1:5500", "https://sflightx.com"], // allowed origins
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+
 
 // Routers
 app.use("/grow_a_garden", growAGardenRouter);
