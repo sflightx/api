@@ -53,38 +53,27 @@ router.get("/:userId", async (req, res) => {
 // POST /:userId -> This is the "SET" part of your backend
 
 router.post("/:userId", async (req, res) => {
-    const { userId } = req.params; // The user doing the action
-    const { targetUserId } = req.body; // The user being followed/unfollowed
-    const authHeader = req.headers.authorization;
+    const { userId } = req.params;
+    const { targetUserId } = req.body;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "Unauthorized" });
+    if (!targetUserId) {
+        return res.status(400).json({ error: "Missing targetUserId" });
     }
 
     try {
-        const idToken = authHeader.split("Bearer ")[1];
-        const decodedToken = await sflightxApp.auth().verifyIdToken(idToken);
-
-        // Security: Ensure the person logged in is the one trying to update their list
-        if (decodedToken.uid !== userId) {
-            return res.status(403).json({ error: "Forbidden: UID mismatch" });
-        }
-
         const followingRef = db.ref(`user/following/${userId}/${targetUserId}`);
         const snapshot = await followingRef.get();
 
         if (snapshot.exists()) {
-            // If already following, remove it (Unfollow)
             await followingRef.remove();
-            res.json({ message: "Unfollowed", status: false });
+            return res.json({ status: false, message: "Unfollowed" });
         } else {
-            // If not following, set it (Follow)
             await followingRef.set(true);
-            res.json({ message: "Followed", status: true });
+            return res.json({ status: true, message: "Followed" });
         }
     } catch (error) {
-        console.error("Set Following Error:", error);
-        res.status(500).json({ error: "Failed to update database" });
+        console.error("POST Error:", error);
+        return res.status(500).json({ error: "Failed to update following" });
     }
 });
 
