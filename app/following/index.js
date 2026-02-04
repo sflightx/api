@@ -27,42 +27,29 @@ const router = express.Router();
 
 // ADD OR REMOVE FOLLOWING
 
-router.post("/:userId", async (req, res) => {
+router.get("/:userId", async (req, res) => {
+    const { userId } = req.params;
     const authHeader = req.headers.authorization;
-    const urlUserId = req.params.userId;
-    const { targetUserId } = req.body;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return res.status(401).json({ error: "Unauthorized" });
     }
-    const idToken = authHeader.split("Bearer ")[1];
-    try {
-        const decodedToken = await sflightxApp.auth().verifyIdToken(idToken);
-        const requesterUserId = decodedToken.uid;
-        if (requesterUserId !== urlUserId) {
-            return res.status(403).json({ error: "Forbidden: User ID mismatch" });
-        }
-        const followingRef = db.ref(`user/following/${urlUserId}/${targetUserId}`);
-        const followingSnap = await followingRef.get();
-        if (followingSnap.exists()) {
-            await followingRef.remove();
-            res.json({ message: `Unfollowed user ${targetUserId}` });
-        } else {
-            await followingRef.set(true);
-            res.json({ message: `Followed user ${targetUserId}` });
-        }
-    } catch (error) {
-        console.error("Following API Error:", error);
-        res.status(500).json({ error: "Failed to update following status" });
-    }
 
-    //USAGE EXAMPLE:
-    // POST /following/:userId
-    // Headers: { Authorization: "Bearer <ID_TOKEN>" }
-    // Body: { "targetUserId": "<TARGET_USER_ID>" }
+    try {
+        const idToken = authHeader.split("Bearer ")[1];
+        // Verify token to ensure requester is authenticated
+        await sflightxApp.auth().verifyIdToken(idToken);
+
+        const followingSnap = await db.ref(`user/following/${userId}`).get();
+        const following = followingSnap.exists() ? Object.keys(followingSnap.val()) : [];
+
+        res.json({ following });
+    } catch (error) {
+        console.error("Following GET Error:", error);
+        res.status(403).json({ error: "Invalid Token" });
+    }
 });
 
-// Ensure this is mounted at '/app/following' in your main server file
 router.get("/:userId", async (req, res) => {
     const { userId } = req.params;
     const authHeader = req.headers.authorization;
@@ -87,3 +74,5 @@ router.get("/:userId", async (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
+export default router;
