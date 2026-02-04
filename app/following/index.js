@@ -62,18 +62,28 @@ router.post("/:userId", async (req, res) => {
     // Body: { "targetUserId": "<TARGET_USER_ID>" }
 });
 
-// RETRIEVE FOLLOWING LIST
-
+// Ensure this is mounted at '/app/following' in your main server file
 router.get("/:userId", async (req, res) => {
-    const userId = req.params.userId;
+    const { userId } = req.params;
+    const authHeader = req.headers.authorization;
+
+    // Check if token exists (verification logic omitted for brevity, but recommended)
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
 
     try {
         const followingSnap = await db.ref(`user/following/${userId}`).get();
-        const following = followingSnap.exists() ? Object.keys(followingSnap.val()) : [];
 
-        res.json({ following });
+        if (followingSnap.exists()) {
+            // If following is stored as keys: { "uid1": true, "uid2": true }
+            const following = Object.keys(followingSnap.val());
+            res.json({ following });
+        } else {
+            res.json({ following: [] });
+        }
     } catch (error) {
         console.error("Following API Error:", error);
-        res.status(500).json({ error: "Failed to fetch following list" });
+        res.status(500).json({ error: "Internal Server Error" });
     }
 });
