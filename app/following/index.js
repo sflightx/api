@@ -50,28 +50,41 @@ router.get("/:userId", async (req, res) => {
     }
 });
 
-router.get("/:userId", async (req, res) => {
-    const { userId } = req.params;
+// POST /:userId -> This is the "SET" part of your backend
+
+router.post("/:userId", async (req, res) => {
+    const { userId } = req.params; // The user doing the action
+    const { targetUserId } = req.body; // The user being followed/unfollowed
     const authHeader = req.headers.authorization;
 
-    // Check if token exists (verification logic omitted for brevity, but recommended)
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return res.status(401).json({ error: "Unauthorized" });
     }
 
     try {
-        const followingSnap = await db.ref(`user/following/${userId}`).get();
+        const idToken = authHeader.split("Bearer ")[1];
+        const decodedToken = await sflightxApp.auth().verifyIdToken(idToken);
 
-        if (followingSnap.exists()) {
-            // If following is stored as keys: { "uid1": true, "uid2": true }
-            const following = Object.keys(followingSnap.val());
-            res.json({ following });
+        // Security: Ensure the person logged in is the one trying to update their list
+        if (decodedToken.uid !== userId) {
+            return res.status(403).json({ error: "Forbidden: UID mismatch" });
+        }
+
+        const followingRef = db.ref(`user/following/${userId}/${targetUserId}`);
+        const snapshot = await followingRef.get();
+
+        if (snapshot.exists()) {
+            // If already following, remove it (Unfollow)
+            await followingRef.remove();
+            res.json({ message: "Unfollowed", status: false });
         } else {
-            res.json({ following: [] });
+            // If not following, set it (Follow)
+            await followingRef.set(true);
+            res.json({ message: "Followed", status: true });
         }
     } catch (error) {
-        console.error("Following API Error:", error);
-        res.status(500).json({ error: "Internal Server Error" });
+        console.error("Set Following Error:", error);
+        res.status(500).json({ error: "Failed to update database" });
     }
 });
 
