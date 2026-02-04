@@ -61,19 +61,28 @@ router.post("/:userId", async (req, res) => {
     }
 
     try {
-        const followingRef = db.ref(`user/following/${userId}/${targetUserId}`);
-        const snapshot = await followingRef.get();
+        const followingPath = `user/following/${userId}/${targetUserId}`;
+        const followersPath = `user/followers/${targetUserId}/${userId}`;
 
+        const snapshot = await db.ref(followingPath).get();
+
+        const updates = {};
         if (snapshot.exists()) {
-            await followingRef.remove();
+            updates[followingPath] = null;
+            updates[followersPath] = null;
+
+            await db.ref().update(updates);
             return res.json({ status: false, message: "Unfollowed" });
         } else {
-            await followingRef.set(true);
+            updates[followingPath] = true;
+            updates[followersPath] = true;
+
+            await db.ref().update(updates);
             return res.json({ status: true, message: "Followed" });
         }
     } catch (error) {
-        console.error("POST Error:", error);
-        return res.status(500).json({ error: "Failed to update following" });
+        console.error("Atomic Update Error:", error);
+        return res.status(500).json({ error: "Failed to update following status" });
     }
 });
 
