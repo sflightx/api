@@ -84,6 +84,25 @@ router.get("/:uid", async (req, res) => {
   }
 });
 
+/**
+ * returns the user's profile picture URL
+ */
+router.get("/:uid/profilePicture", async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const profilePicRef = db.ref(`userdata/${uid}/profile`);
+    const snapshot = await profilePicRef.get();
+    if (!snapshot.exists()) {
+      return res.status(404).json({ error: "Profile picture not found" });
+    }
+    const pictureUrl = snapshot.val();
+    res.json({ pictureUrl });
+  } catch (err) {
+    console.error("Error fetching profile picture:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 
 /**
  * GET /app/user/:uid/verified

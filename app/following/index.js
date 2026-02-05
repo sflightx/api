@@ -41,9 +41,17 @@ router.get("/:userId", async (req, res) => {
         await sflightxApp.auth().verifyIdToken(idToken);
 
         const followingSnap = await db.ref(`user/following/${userId}`).get();
-        const following = followingSnap.exists() ? Object.keys(followingSnap.val()) : [];
+        const followerSnap = await db.ref(`user/followers/${userId}`).get();
 
-        res.json({ following });
+        const following = followingSnap.exists() ? Object.keys(followingSnap.val()) : [];
+        const followers = followerSnap.exists() ? Object.keys(followerSnap.val()) : [];
+
+        res.json({
+            following,
+            followers,
+            followingCount: following.length,
+            followersCount: followers.length,
+        });
     } catch (error) {
         console.error("Following GET Error:", error);
         res.status(403).json({ error: "Invalid Token" });
