@@ -87,7 +87,7 @@ router.get("/:uid", async (req, res) => {
 /**
  * returns the user's profile picture URL
  */
-router.get("/:uid/profilePicture", async (req, res) => {
+router.get("/:uid/profile", async (req, res) => {
   try {
     const { uid } = req.params;
     const profilePicRef = db.ref(`userdata/${uid}/profile`);
