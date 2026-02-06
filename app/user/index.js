@@ -103,6 +103,25 @@ router.get("/:uid/profile", async (req, res) => {
   }
 });
 
+/**
+ * returns the user's username
+ */
+router.get("/:uid/username", async (req, res) => {
+  try {
+    const { uid } = req.params;
+    const usernameRef = db.ref(`userdata/${uid}/username`);
+    const snapshot = await usernameRef.get();
+    if (!snapshot.exists()) {
+      return res.status(404).json({ error: "Username not found" });
+    }
+    const username = snapshot.val();
+    res.json({ username });
+  } catch (err) {
+    console.error("Error fetching username:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 
 /**
  * GET /app/user/:uid/verified
