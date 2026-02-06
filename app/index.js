@@ -56,7 +56,7 @@ router.get("/search", async (req, res) => {
 
     const normalize = (id, data) => ({
       id,
-      authorId: data.authorId || "",
+      author: data.author || "",
       name: data.name || "",
       desc: data.desc || "",
       image_url: data.image_url || "",
