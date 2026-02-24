@@ -40,12 +40,7 @@ async function verifyToken(req, res, next) {
 router.get("/:key", async (req, res) => {
     try {
         const { key } = req.params;
-        const { limit = 25 } = req.query;
-
-        const commentSnap = await db.ref(`comment/upload/blueprint/${key}`)
-            .orderByChild('timestamp')
-            .limitToLast(parseInt(limit))
-            .get();
+        const commentSnap = await db.ref(`comment/upload/blueprint/${key}`).get();
 
         if (!commentSnap.exists()) {
             return res.json([]);
@@ -53,19 +48,21 @@ router.get("/:key", async (req, res) => {
 
         const data = commentSnap.val();
 
+        if (typeof data !== 'object') {
+            return res.json([]);
+        }
+
         const commentsArray = Object.keys(data).map(id => ({
             ...data[id],
             key: id
         }));
 
-        commentsArray.sort((a, b) => b.timestamp - a.timestamp);
-
         res.json(commentsArray);
-
     } catch (error) {
-        console.error("Error fetching comments:", error);
-        // Return 500 but keep the body empty or a simple error list
-        res.status(500).json({ error: "Internal server error" });
+        console.error("Backend Error:", error);
+        // CRITICAL: Return an empty array [] even on error so the app doesn't crash
+        // while you are debugging the server.
+        res.status(500).json([]);
     }
 });
 
