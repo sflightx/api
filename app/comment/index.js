@@ -40,28 +40,28 @@ async function verifyToken(req, res, next) {
 router.get("/:key", async (req, res) => {
     try {
         const { key } = req.params;
+
         const commentSnap = await db.ref(`comment/upload/blueprint/${key}`).get();
 
         if (!commentSnap.exists()) {
             return res.json([]);
         }
 
-        const data = commentSnap.val();
+        const rawData = commentSnap.val();
 
-        if (typeof data !== 'object') {
-            return res.json([]);
-        }
+        const commentsArray = Object.keys(rawData).map(commentId => {
+            const comment = rawData[commentId];
+            return {
+                ...comment,
+                key: commentId
+            };
+        });
 
-        const commentsArray = Object.keys(data).map(id => ({
-            ...data[id],
-            key: id
-        }));
+        commentsArray.sort((a, b) => b.timestamp - a.timestamp);
 
         res.json(commentsArray);
     } catch (error) {
-        console.error("Backend Error:", error);
-        // CRITICAL: Return an empty array [] even on error so the app doesn't crash
-        // while you are debugging the server.
+        console.error("Backend fetch error:", error);
         res.status(500).json([]);
     }
 });
