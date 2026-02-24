@@ -9,20 +9,11 @@ const sflightxServiceAccount = JSON.parse(
   fs.readFileSync("/etc/secrets/serviceAccount_sflightx.json", "utf-8")
 );
 
-let sflightxApp;
-
-// Initialize named Firebase app if not exists
-if (!admin.apps.some((a) => a.name === "sflightxApp")) {
-  sflightxApp = admin.initializeApp(
-    {
-      credential: admin.credential.cert(sflightxServiceAccount),
-      databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/",
-    },
-    "sflightxApp"
-  );
-} else {
-  sflightxApp = admin.app("sflightxApp");
-}
+const sflightxApp = admin.apps.find(a => a.name === "sflightxApp")
+  || admin.initializeApp({
+    credential: admin.credential.cert(sflightxServiceAccount),
+    databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/",
+  }, "sflightxApp");
 
 const db = getDatabase(sflightxApp);
 const router = express.Router();
@@ -37,7 +28,7 @@ async function verifyToken(req, res, next) {
   const token = authHeader.split("Bearer ")[1];
 
   try {
-    const decoded = await admin.auth().verifyIdToken(token);
+    const decoded = await admin.auth(sflightxApp).verifyIdToken(token);
     req.user = decoded; // contains uid, email, etc.
     next();
   } catch (error) {
@@ -63,7 +54,16 @@ router.get("/:uid", async (req, res) => {
 
     const userData = userSnap.val();
 
-    const response = { uid, ...userData };
+    const response = {
+      uid: uid,
+      username: userData.username,
+      bio: userData.bio,
+      profile: userData.profile,
+      profile_verified: userData.profile_verified,
+      profile_version: userData.profile_version,
+      link: userData.link || {}, // Includes X and YouTube from your screenshot
+      timestamp_join: userData.timestamp_join
+    };
 
     if (includeCompany && userData.companyId) {
       const companySnap = await db
@@ -71,7 +71,13 @@ router.get("/:uid", async (req, res) => {
         .get();
 
       if (companySnap.exists()) {
-        response.company = companySnap.val();
+        const companyData = companySnap.val();
+        response.company = {
+          name: companyData.name,
+          desc: companyData.desc,
+          thumbnail: companyData.thumbnail,
+          link: companyData.link || {},
+        };
       } else {
         response.company = null;
       }
@@ -154,6 +160,7 @@ router.get("/:uid/verified", async (req, res) => {
  */
 router.post("/:uid/updateProfile", verifyToken, async (req, res) => {
   const { uid } = req.params;
+  const { username, profile } = req.body;
 
   // ✅ Ensure token UID matches the target UID
   if (req.user.uid !== uid) {
@@ -163,23 +170,25 @@ router.post("/:uid/updateProfile", verifyToken, async (req, res) => {
     });
   }
 
+  const cleanUsername = username?.replace(/<[^>]*>?/gm, '').trim();
+  const cleanProfile = profile?.replace(/<[^>]*>?/gm, '').trim();
+
+  if (cleanUsername && cleanUsername.length > 25) {
+    return res.status(400).json({ error: "Username too long" });
+  }
+
   try {
     const db = getDatabase();
 
-    // ✅ Get latest profile version
-    const versionSnap = await get(ref(db, "app/profile/version"));
+    const versionSnap = await db.ref("app/profile/version").get();
     const latestVersion = versionSnap.val() || "unknown";
 
-    // ✅ Gather user data (from request or decoded token)
     const userData = {
-      username: req.user.displayName || req.body.username,
-      profile: req.user.profile || req.body.profile,
+      username: cleanUsername || req.user.displayName,
+      profile: cleanProfile || req.user.profile,
     };
 
-    // ✅ Ensure profile exists and is updated
     await completeProfileDetails(uid, userData, latestVersion);
-
-    // ✅ Optionally migrate user uploads
     await migrateUserUpload(uid);
 
     res.json({
