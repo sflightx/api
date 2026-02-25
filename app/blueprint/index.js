@@ -78,7 +78,8 @@ router.post("/:key", async (req, res) => {
       downloads,
       image_url,
       req_game,
-      req_type
+      req_type,
+      video_link
     } = req.body;
 
     // Use urlKey if key is not provided in body
