@@ -101,6 +101,7 @@ router.post("/:key", async (req, res) => {
       image_url: image_url || "",
       req_game: req_game || "Unknown",
       req_type: req_type || "Other",
+      video_link: video_link || null,
       key: finalKey,
     };
 
