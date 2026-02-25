@@ -109,20 +109,20 @@ router.get("/search", async (req, res) => {
     const trending = Object.entries(allBlueprints)
       .map(([id, d]) => normalize(id, d))
       .sort((a, b) => (b.like + b.downloads) - (a.like + a.downloads))
-      .slice(0, 10);
+      .slice(0, limit);
 
     // 🕓 Recent
     const recent = Object.entries(allBlueprints)
       .map(([id, d]) => normalize(id, d))
       .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, 10);
+      .slice(0, limit);
 
     res.json({
       query,
       total: searchResults.length,
       results: {
         search: searchResults.slice(0, limit),
-        personalized: personalizedResults.slice(0, 10),
+        personalized: personalizedResults.slice(0, limit),
         trending,
         recent,
       },
