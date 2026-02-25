@@ -66,4 +66,65 @@ router.get("/:key", async (req, res) => {
     }
 });
 
+router.delete("/:key/:commentId", verifyToken, async (req, res) => {
+    // 1. Token & Header Validation
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({
+            success: false,
+            error: "Unauthorized: Missing or malformed Bearer token"
+        });
+    }
+
+    try {
+        const { key, commentId } = req.params;
+
+        const uid = req.user?.uid;
+        if (!uid) {
+            return res.status(401).json({ success: false, error: "Invalid user session" });
+        }
+
+        const commentRef = db.ref(`comment/upload/blueprint/${key}/${commentId}`);
+        const snapshot = await commentRef.get();
+
+        // 2. Existence Check
+        if (!snapshot.exists()) {
+            return res.status(404).json({
+                success: false,
+                error: "Comment not found"
+            });
+        }
+
+        const commentData = snapshot.val();
+
+        // 3. Ownership Validation
+        // Check if the user is the author OR potentially an admin
+        const isAuthor = commentData.authorId === uid;
+
+        if (!isAuthor) {
+            return res.status(403).json({
+                success: false,
+                error: "Forbidden: You do not have permission to delete this comment"
+            });
+        }
+
+        // 4. Atomic Deletion
+        await commentRef.remove();
+
+        return res.status(200).json({
+            success: true,
+            message: "Comment successfully deleted"
+        });
+
+    } catch (error) {
+        console.error(`[DeleteError] Path: ${req.originalUrl} | Error:`, error.message);
+
+        return res.status(500).json({
+            success: false,
+            error: "Internal server error occurred during deletion"
+        });
+    }
+});
+
 export default router;
