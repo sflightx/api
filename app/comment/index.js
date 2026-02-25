@@ -100,7 +100,7 @@ router.delete("/:key/:commentId", verifyToken, async (req, res) => {
 
         // 3. Ownership Validation
         // Check if the user is the author OR potentially an admin
-        const isAuthor = commentData.authorId === uid;
+        const isAuthor = commentData.author === uid;
 
         if (!isAuthor) {
             return res.status(403).json({
