@@ -9,12 +9,16 @@ import {
   SlashCommandBuilder,
 } from "discord.js";
 import dotenv from "dotenv";
+
 dotenv.config();
 
-const { DISCORD_TOKEN, CLIENT_ID, MC_SERVER_IP, MC_SERVER_PORT } = process.env;
-const router = express.Router();
-const app = express();
+const { DISCORD_TOKEN, CLIENT_ID, MC_SERVER_IP, MC_SERVER_PORT, PORT } = process.env;
 
+// 1. Initialize Express App
+const app = express();
+const listenPort = PORT || 10000;
+
+// Health Check Routes for Render & UptimeRobot
 app.get("/", (req, res) => {
   res.status(200).json({ status: "online", message: "SFlightX and VoidCraft Discord Bot & API active!" });
 });
@@ -23,17 +27,19 @@ app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
+// 2. Define Slash Commands
 const commands = [
   new SlashCommandBuilder()
     .setName("status")
     .setDescription("Check status of the server and player count.")
-].map(command => command.toJSON());
+].map((command) => command.toJSON());
 
+// 3. Initialize Discord Client
 export const client = new Client({
-  intents: [GatewayIntentBits.Guilds]
+  intents: [GatewayIntentBits.Guilds],
 });
 
-//register ping commands
+// 4. Register Slash Commands on Ready
 client.once(Events.ClientReady, async (c) => {
   console.log(`Ready! Logged in as ${c.user.tag}`);
 
@@ -53,14 +59,13 @@ client.once(Events.ClientReady, async (c) => {
   }
 });
 
+// 5. Interaction Handler
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
   const { commandName } = interaction;
 
-  // Handle /status command
   if (commandName === "status") {
-    // Acknowledge the interaction immediately to prevent 3-second timeouts
     await interaction.deferReply();
 
     const host = MC_SERVER_IP || "voidcraftsmp.mcsh.io";
@@ -89,6 +94,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
+// 6. Start Web Server (Keeps Process Alive on Render)
+app.listen(listenPort, "0.0.0.0", () => {
+  console.log(`🚀 Web server listening on port ${listenPort}`);
+});
+
+// 7. Login to Discord
 if (DISCORD_TOKEN) {
   client.login(DISCORD_TOKEN).catch((error) => {
     console.error("❌ Error logging in to Discord:", error);
@@ -96,5 +107,3 @@ if (DISCORD_TOKEN) {
 } else {
   console.error("❌ DISCORD_TOKEN is missing in environment variables!");
 }
-
-export default router;
