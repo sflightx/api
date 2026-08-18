@@ -1,3 +1,4 @@
+import express from "express";
 import { Client, GatewayIntentBits, Events } from "discord.js";
 import dotenv from "dotenv";
 dotenv.config();
