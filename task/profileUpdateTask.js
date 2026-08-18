@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import fs from "fs";
 
 const sflightxServiceAccount = JSON.parse(
   fs.readFileSync("/etc/secrets/serviceAccount_sflightx.json", "utf-8")
