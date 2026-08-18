@@ -1,9 +1,17 @@
 import express from "express";
-import { Client, GatewayIntentBits, Events } from "discord.js";
+import axios from "axios";
+import {
+  Client,
+  GatewayIntentBits,
+  Events,
+  REST,
+  Routes,
+  SlashCommandBuilder,
+} from "discord.js";
 import dotenv from "dotenv";
 dotenv.config();
 
-const { DISCORD_TOKEN } = process.env;
+const { DISCORD_TOKEN, CLIENT_ID, MC_SERVER_IP, MC_SERVER_PORT } = process.env;
 const router = express.Router();
 const app = express();
 
