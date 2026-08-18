@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 
-import growAGardenRouter from "./grow_a_garden/index.js";
+//import growAGardenRouter from "./grow_a_garden/index.js";
 import discordRouter from "./discord/index.js";
 
 import appRouter from "./app/index.js";
@@ -25,7 +25,7 @@ app.use(cors({
 
 
 // Routers
-app.use("/grow_a_garden", growAGardenRouter);
+//app.use("/grow_a_garden", growAGardenRouter);
 app.use("/discord", discordRouter);
 
 app.use("/app", appRouter);
@@ -37,7 +37,7 @@ app.use("/app/notification", appNotificationRouter);
 
 // Health check
 app.get("/", (req, res) => {
-  res.send("✅ API root: api.sflightx.com");
+  res.send("✅ API root: api.sflightx.com is working.");
 });
 
 const PORT = process.env.PORT || 8080;
