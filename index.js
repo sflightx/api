@@ -30,12 +30,8 @@ app.use("/app/comment", appCommentRouter);
 app.use("/app/following", appFollowingRouter);
 app.use("/app/notification", appNotificationRouter);
 
-app.get("/api/discord", (req, res) => {
-  res.json({ message: "SFlightX Discord API online!" });
-});
-
 // Health check endpoint for UptimeRobot / Render
-app.get("/health", (req, res) => {
+app.get("/discord/health", (req, res) => {
   res.status(200).send("OK");
 });
 
