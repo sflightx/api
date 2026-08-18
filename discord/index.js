@@ -12,7 +12,7 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const { DISCORD_TOKEN, CLIENT_ID, MC_SERVER_IP, MC_SERVER_PORT } = process.env;
+const { DISCORD_TOKEN, CLIENT_ID, MC_SERVER_IP, MC_SERVER_PORT, CHANNEL_ID } = process.env;
 
 // 1. Define Slash Commands
 const commands = [
@@ -37,20 +37,63 @@ export const client = new Client({
 client.once(Events.ClientReady, async (c) => {
   console.log(`🤖 Discord Bot Ready! Logged in as ${c.user.tag}`);
 
-  const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
+  // Start checking the Minecraft server status every 30 seconds
+  const CHECK_INTERVAL = 30 * 1000; // 30,000 ms
 
-  try {
-    console.log("Started refreshing application (/) commands.");
+  setInterval(async () => {
+    const host = MC_SERVER_IP || "voidcraftsmp.mcsh.io";
+    const port = MC_SERVER_PORT || 19132;
 
-    await rest.put(
-      Routes.applicationCommands(CLIENT_ID || c.user.id),
-      { body: commands }
-    );
+    try {
+      const response = await axios.get(`https://api.mcstatus.io/v2/status/bedrock/${host}:${port}`);
+      const data = response.data;
 
-    console.log("Successfully reloaded application (/) commands.");
-  } catch (error) {
-    console.error("Failed to register slash commands:", error);
-  }
+      // 1. STATE TRANSITION: Server just came ONLINE
+      if (data.online && !isServerOnline) {
+        isServerOnline = true; // Update state
+        console.log("🟢 Server boot detected! Sending Discord announcement...");
+
+        const channel = await client.channels.fetch(ANNOUNCEMENT_CHANNEL_ID).catch(() => null);
+
+        if (channel) {
+          const onlineNotificationEmbed = new EmbedBuilder()
+            .setColor(0x2ecc71) // Green
+            .setTitle("🚀 VoidCraft SMP is Now ONLINE!")
+            .setDescription("The server has booted up and is ready for players to join!")
+            .addFields(
+              { name: "📡 Address", value: `\`${host}:${port}\``, inline: true },
+              { name: "🏷️ Version", value: `\`${data.version?.name || "Bedrock Edition"}\``, inline: true },
+              { name: "👥 Capacity", value: `\`${data.players.max} Max Players\``, inline: true }
+            )
+            .setFooter({ text: "Automated Server Status Watcher" })
+            .setTimestamp();
+
+          await channel.send({ embeds: [onlineNotificationEmbed] });
+        }
+      } 
+      
+      // 2. STATE TRANSITION: Server went OFFLINE
+      else if (!data.online && isServerOnline) {
+        isServerOnline = false; // Reset state so it alerts on next boot
+        console.log("🔴 Server shutdown detected.");
+
+        const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
+
+        if (channel) {
+          const offlineNotificationEmbed = new EmbedBuilder()
+            .setColor(0xe74c3c) // Red
+            .setTitle("🛑 VoidCraft SMP Went Offline")
+            .setDescription("The server is currently undergoing maintenance or restarting.")
+            .setFooter({ text: "Automated Server Status Watcher" })
+            .setTimestamp();
+
+          await channel.send({ embeds: [offlineNotificationEmbed] });
+        }
+      }
+    } catch (err) {
+      console.error("Status watcher poll error:", err.message);
+    }
+  }, CHECK_INTERVAL);
 });
 
 // 4. Interaction Handler and Checking
