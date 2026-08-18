@@ -17,9 +17,6 @@ router.get("/", (req, res) => {
 const {
     DISCORD_TOKEN,
     CHANNEL_ID,
-    RCON_HOST,
-    RCON_PORT,
-    RCON_PASSWORD,
     API_URL
 } = process.env;
 
@@ -35,7 +32,7 @@ const client = new Client({
 const webhookClient = WEBHOOK_URL ? new WebhookClient({ url: WEBHOOK_URL }) : null;
 
 client.once('ready', () => {
-    console.log(`[SFlightX Bot] Logged in as ${client.user.tag}`);
+    console.log(`[VoidCraft Messenger] Logged in as ${client.user.tag}`);
 });
 
 export default router;
