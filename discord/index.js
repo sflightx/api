@@ -1,5 +1,3 @@
-import express from "express";
-import axios from "axios";
 import {
   Client,
   GatewayIntentBits,
@@ -8,40 +6,28 @@ import {
   Routes,
   SlashCommandBuilder,
 } from "discord.js";
+import axios from "axios";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const { DISCORD_TOKEN, CLIENT_ID, MC_SERVER_IP, MC_SERVER_PORT, PORT } = process.env;
+const { DISCORD_TOKEN, CLIENT_ID, MC_SERVER_IP, MC_SERVER_PORT } = process.env;
 
-// 1. Initialize Express App
-const app = express();
-const listenPort = PORT || 10000;
-
-// Health Check Routes for Render & UptimeRobot
-app.get("/", (req, res) => {
-  res.status(200).json({ status: "online", message: "SFlightX and VoidCraft Discord Bot & API active!" });
-});
-
-app.get("/health", (req, res) => {
-  res.status(200).send("OK");
-});
-
-// 2. Define Slash Commands
+// 1. Define Slash Commands
 const commands = [
   new SlashCommandBuilder()
     .setName("status")
     .setDescription("Check status of the server and player count.")
 ].map((command) => command.toJSON());
 
-// 3. Initialize Discord Client
+// 2. Initialize Discord Client
 export const client = new Client({
   intents: [GatewayIntentBits.Guilds],
 });
 
-// 4. Register Slash Commands on Ready
+// 3. Register Slash Commands on Ready
 client.once(Events.ClientReady, async (c) => {
-  console.log(`Ready! Logged in as ${c.user.tag}`);
+  console.log(`🤖 Discord Bot Ready! Logged in as ${c.user.tag}`);
 
   const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
 
@@ -59,7 +45,7 @@ client.once(Events.ClientReady, async (c) => {
   }
 });
 
-// 5. Interaction Handler
+// 4. Interaction Handler
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -94,12 +80,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// 6. Start Web Server (Keeps Process Alive on Render)
-app.listen(listenPort, "0.0.0.0", () => {
-  console.log(`🚀 Web server listening on port ${listenPort}`);
-});
-
-// 7. Login to Discord
+// 5. Login to Discord
 if (DISCORD_TOKEN) {
   client.login(DISCORD_TOKEN).catch((error) => {
     console.error("❌ Error logging in to Discord:", error);
