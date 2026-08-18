@@ -23,6 +23,13 @@ const commands = [
 // 2. Initialize Discord Client
 export const client = new Client({
   intents: [GatewayIntentBits.Guilds],
+  presence: {
+    status: 'online',
+    activities: [{
+      name: '/Checking status of VoidCraft SMP',
+      type: 0 // Playing
+    }]
+  }
 });
 
 // 3. Register Slash Commands on Ready
@@ -78,6 +85,15 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await interaction.editReply(`❌ **Failed to ping server:** Could not fetch status for \`${host}:${port}\`.`);
     }
   }
+});
+
+// Prevent process crashes from unhandled promise rejections
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception thrown:", err);
 });
 
 // 5. Login to Discord
