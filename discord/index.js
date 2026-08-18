@@ -1,6 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
-import { Client, GatewayIntentBits, WebhookClient } from "discord.js";
+import { Client, GatewayIntentBits, Events } from "discord.js";
 dotenv.config();
 
 const router = express.Router();
@@ -24,10 +24,12 @@ const client = new Client({
     ]
 });
 
-const webhookClient = WEBHOOK_URL ? new WebhookClient({ url: WEBHOOK_URL }) : null;
+client.once(Events.ClientReady, (readyClient) => {
+	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+});
 
-client.once('ready', () => {
-    console.log(`[VoidCraft Messenger] Logged in as ${client.user.tag}`);
+client.login(DISCORD_TOKEN).catch((error) => {
+    console.error("❌ Error logging in to Discord:", error);
 });
 
 export default router;
