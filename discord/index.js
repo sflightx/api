@@ -5,6 +5,7 @@ dotenv.config();
 
 const { DISCORD_TOKEN } = process.env;
 const router = express.Router();
+const app = express();
 
 app.get("/", (req, res) => {
   res.status(200).json({ status: "online", message: "SFlightX and VoidCraft Discord Bot & API active!" });
