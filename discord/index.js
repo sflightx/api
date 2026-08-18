@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const { DISCORD_TOKEN } = process.env;
+const router = express.Router();
 
 export const client = new Client({
   intents: [
