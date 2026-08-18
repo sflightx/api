@@ -1,11 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
 import { Client, GatewayIntentBits, WebhookClient } from "discord.js";
-import { Rcon } from "rcon-client";
-import axios from "axios";
-import TailModule from "tail";
-
-const { Tail } = TailModule;
 dotenv.config();
 
 const router = express.Router();
