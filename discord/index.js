@@ -60,7 +60,7 @@ client.once(Events.ClientReady, async (c) => {
         if (channel) {
           const onlineNotificationEmbed = new EmbedBuilder()
             .setColor(0x2ecc71) // Green
-            .setTitle("Server is ONLINE!")
+            .setTitle("Server is now ONLINE!")
             .setDescription("The server is available for players to join.")
             .addFields(
               { name: "📡 Address", value: `\`${host}:${port}\``, inline: true },
@@ -83,7 +83,7 @@ client.once(Events.ClientReady, async (c) => {
         if (channel) {
           const offlineNotificationEmbed = new EmbedBuilder()
             .setColor(0xe74c3c) // Red
-            .setTitle("Server went OFFLINE")
+            .setTitle("Server just went OFFLINE")
             .setDescription("Contact any admin regarding the server status. It may be undergoing maintenance or experiencing issues.")
             .setFooter({ text: "Automated Server Status Watcher" })
             .setTimestamp();
@@ -125,12 +125,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const onlineEmbed = new EmbedBuilder()
           .setColor(0x2ecc71) // Green status bar
           .setTitle("🟢 Server is ONLINE")
-          .setDescription("The VoidCraft Minecraft Bedrock server is active and reachable.")
+          .setDescription("The server is active and reachable.")
           .addFields(
-            { name: "📡 Server", value: `\`${host}:${port}\``, inline: true },
+            { name: "📡 Address", value: `\`${host}:${port}\``, inline: true },
             { name: "⚡ Latency", value: `\`${duration}ms\``, inline: true },
-            { name: "👥 Player Count", value: `\`${data.players.online} / ${data.players.max}\``, inline: true },
-            { name: "🏷️ Server Version", value: `\`${data.version?.name || "Bedrock Edition"}\``, inline: false }
+            { name: "👥 Player", value: `\`${data.players.online} / ${data.players.max}\``, inline: true },
+            { name: "🏷️ Version", value: `\`${data.version?.name || "Bedrock Edition"}\``, inline: false }
           )
           .setFooter({ text: "VoidCraft SMP • Live Status" })
           .setTimestamp();
