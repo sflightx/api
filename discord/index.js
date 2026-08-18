@@ -23,3 +23,5 @@ if (DISCORD_TOKEN) {
 } else {
   console.error("❌ DISCORD_TOKEN is missing in environment variables!");
 }
+
+export default router;
