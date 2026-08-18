@@ -103,10 +103,31 @@ process.on("uncaughtException", (err) => {
 console.log("🔍 Checking DISCORD_TOKEN presence:", DISCORD_TOKEN ? "EXISTS (Length: " + DISCORD_TOKEN.length + ")" : "MISSING/UNDEFINED");
 
 // 5. Login to Discord
+const loginWithRetry = async (retries = 5, delay = 5000) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      console.log(`🔑 Attempting client.login() (Attempt ${i + 1}/${retries})...`);
+      await client.login(DISCORD_TOKEN);
+      console.log("✅ client.login() connected successfully!");
+      return; // Exit loop on success
+    } catch (error) {
+      console.error(`❌ Login attempt ${i + 1} failed:`, error.message);
+      
+      // If rate limited (HTTP 429), wait before retrying
+      if (error.status === 429 || error.message.includes("429")) {
+        console.warn(`⏳ Rate-limited by Discord. Retrying in ${delay / 1000}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff (5s, 10s, 20s...)
+      } else {
+        // Non-rate-limit error (e.g., bad token), break immediately
+        break;
+      }
+    }
+  }
+};
+
 if (DISCORD_TOKEN) {
-  client.login(DISCORD_TOKEN).catch((error) => {
-    console.error("❌ Error logging in to Discord:", error);
-  });
+  loginWithRetry();
 } else {
   console.error("❌ DISCORD_TOKEN is missing in environment variables!");
 }
