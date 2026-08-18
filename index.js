@@ -11,6 +11,8 @@ import appCommentRouter from "./app/comment/index.js";
 import appFollowingRouter from "./app/following/index.js";
 import appNotificationRouter from "./app/notification/index.js";
 
+import "./discord/index.js"; // Ensure Discord client is initialized
+
 
 const app = express();
 
@@ -34,6 +36,10 @@ app.use("/app/blueprint", appBlueprintRouter);
 app.use("/app/comment", appCommentRouter);
 app.use("/app/following", appFollowingRouter);
 app.use("/app/notification", appNotificationRouter);
+
+app.get("/api/discord", (req, res) => {
+  res.json({ message: "SFlightX Discord API online!" });
+});
 
 // Health check
 app.get("/", (req, res) => {

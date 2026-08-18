@@ -1,35 +1,25 @@
-import express from "express";
-import dotenv from "dotenv";
 import { Client, GatewayIntentBits, Events } from "discord.js";
+import dotenv from "dotenv";
 dotenv.config();
 
-const router = express.Router();
+const { DISCORD_TOKEN } = process.env;
 
-router.get("/", (req, res) => {
-  res.json({ message: "SFlightX Discord API online!" });
+export const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 
-const {
-    DISCORD_TOKEN,
-    CHANNEL_ID,
-    API_URL
-} = process.env;
-
-// Initialize Discord Client & Webhook
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
-    ]
+client.once(Events.ClientReady, (c) => {
+  console.log(`Ready! Logged in as ${c.user.tag}`);
 });
 
-client.once(Events.ClientReady, (readyClient) => {
-	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
-});
-
-client.login(DISCORD_TOKEN).catch((error) => {
+if (DISCORD_TOKEN) {
+  client.login(DISCORD_TOKEN).catch((error) => {
     console.error("❌ Error logging in to Discord:", error);
-});
-
-export default router;
+  });
+} else {
+  console.error("❌ DISCORD_TOKEN is missing in environment variables!");
+}
