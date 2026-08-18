@@ -2,23 +2,6 @@ import express from "express";
 import cors from "cors";
 
 //import growAGardenRouter from "./grow_a_garden/index.js";
-
-const sflightxServiceAccount = JSON.parse(
-  fs.readFileSync("/etc/secrets/serviceAccount_sflightx.json", "utf-8")
-);
-
-if (!admin.apps.some((a) => a.name === "sflightxApp")) {
-  sflightxApp = admin.initializeApp(
-    {
-      credential: admin.credential.cert(sflightxServiceAccount),
-      databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/",
-    },
-    "sflightxApp"
-  );
-} else {
-  sflightxApp = admin.app("sflightxApp");
-}
-
 import discordRouter from "./discord/index.js";
 
 import appRouter from "./app/index.js";

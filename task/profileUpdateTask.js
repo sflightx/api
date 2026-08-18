@@ -1,5 +1,21 @@
 import admin from "firebase-admin";
 
+const sflightxServiceAccount = JSON.parse(
+  fs.readFileSync("/etc/secrets/serviceAccount_sflightx.json", "utf-8")
+);
+
+if (!admin.apps.some((a) => a.name === "sflightxApp")) {
+  sflightxApp = admin.initializeApp(
+    {
+      credential: admin.credential.cert(sflightxServiceAccount),
+      databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/",
+    },
+    "sflightxApp"
+  );
+} else {
+  sflightxApp = admin.app("sflightxApp");
+}
+
 const db = admin.database();
 
 /**
