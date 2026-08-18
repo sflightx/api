@@ -1,21 +1,12 @@
 import admin from "firebase-admin";
 import fs from "fs";
 
-const sflightxServiceAccount = JSON.parse(
-  fs.readFileSync("/etc/secrets/serviceAccount_sflightx.json", "utf-8")
-);
+const serviceAccount = JSON.parse(fs.readFileSync("/etc/secrets/serviceAccount_gag.json", "utf-8"));
 
-if (!admin.apps.some((a) => a.name === "sflightxApp")) {
-  sflightxApp = admin.initializeApp(
-    {
-      credential: admin.credential.cert(sflightxServiceAccount),
-      databaseURL: "https://sflight-x-default-rtdb.firebaseio.com/",
-    },
-    "sflightxApp"
-  );
-} else {
-  sflightxApp = admin.app("sflightxApp");
-}
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: "https://stock-grow-a-garden-default-rtdb.firebaseio.com/"
+});
 
 const db = admin.database();
 
