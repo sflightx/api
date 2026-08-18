@@ -52,7 +52,11 @@ client.once(Events.ClientReady, async (c) => {
   }
 });
 
-// 4. Interaction Handler
+// 4. Interaction Handler and Checking
+axios.get("https://discord.com/api/v10/gateway")
+  .then(res => console.log("🌐 Discord Gateway reachable:", res.data.url))
+  .catch(err => console.error("❌ Discord Network Error:", err.message));
+
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -95,6 +99,8 @@ process.on("unhandledRejection", (reason, promise) => {
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception thrown:", err);
 });
+
+console.log("🔍 Checking DISCORD_TOKEN presence:", DISCORD_TOKEN ? "EXISTS (Length: " + DISCORD_TOKEN.length + ")" : "MISSING/UNDEFINED");
 
 // 5. Login to Discord
 if (DISCORD_TOKEN) {
