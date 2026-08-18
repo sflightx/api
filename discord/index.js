@@ -27,7 +27,7 @@ export const client = new Client({
   presence: {
     status: 'online',
     activities: [{
-      name: '/Checking status of VoidCraft SMP',
+      name: 'Checking status of VoidCraft SMP',
       type: 0 // Playing
     }]
   }
@@ -43,8 +43,8 @@ client.once(Events.ClientReady, async (c) => {
   const CHECK_INTERVAL = 30 * 1000; // 30,000 ms
 
   setInterval(async () => {
-    const host = MC_SERVER_IP || "voidcraftsmp.mcsh.io";
-    const port = MC_SERVER_PORT || 19132;
+    const host = MC_SERVER_IP || "15.235.144.117";
+    const port = MC_SERVER_PORT || 14902;
 
     try {
       const response = await axios.get(`https://api.mcstatus.io/v2/status/bedrock/${host}:${port}`);
@@ -60,12 +60,11 @@ client.once(Events.ClientReady, async (c) => {
         if (channel) {
           const onlineNotificationEmbed = new EmbedBuilder()
             .setColor(0x2ecc71) // Green
-            .setTitle("🚀 VoidCraft SMP is Now ONLINE!")
-            .setDescription("The server has booted up and is ready for players to join!")
+            .setTitle("Server is ONLINE!")
+            .setDescription("The server is available for players to join.")
             .addFields(
               { name: "📡 Address", value: `\`${host}:${port}\``, inline: true },
               { name: "🏷️ Version", value: `\`${data.version?.name || "Bedrock Edition"}\``, inline: true },
-              { name: "👥 Capacity", value: `\`${data.players.max} Max Players\``, inline: true }
             )
             .setFooter({ text: "Automated Server Status Watcher" })
             .setTimestamp();
@@ -84,8 +83,8 @@ client.once(Events.ClientReady, async (c) => {
         if (channel) {
           const offlineNotificationEmbed = new EmbedBuilder()
             .setColor(0xe74c3c) // Red
-            .setTitle("🛑 VoidCraft SMP Went Offline")
-            .setDescription("The server is currently undergoing maintenance or restarting.")
+            .setTitle("Server went OFFLINE")
+            .setDescription("Contact any admin regarding the server status. It may be undergoing maintenance or experiencing issues.")
             .setFooter({ text: "Automated Server Status Watcher" })
             .setTimestamp();
 
@@ -111,8 +110,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "status") {
     await interaction.deferReply();
 
-    const host = MC_SERVER_IP || "voidcraftsmp.mcsh.io";
-    const port = MC_SERVER_PORT || 19132;
+    const host = MC_SERVER_IP || "15.235.144.117";
+    const port = MC_SERVER_PORT || 14902
+
+;
     const startTime = Date.now();
 
     try {
@@ -141,7 +142,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setTitle("🔴 Server is OFFLINE")
           .setDescription(`Unable to establish a connection to \`${host}:${port}\`.`)
           .addFields(
-            { name: "Status", value: "Offline / Unreachable", inline: true },
             { name: "Server Address", value: `\`${host}:${port}\``, inline: true }
           )
           .setFooter({ text: "VoidCraft SMP • Live Status" })
