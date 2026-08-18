@@ -33,6 +33,8 @@ export const client = new Client({
   }
 });
 
+let isServerOnline = false;
+
 // 3. Register Slash Commands on Ready
 client.once(Events.ClientReady, async (c) => {
   console.log(`🤖 Discord Bot Ready! Logged in as ${c.user.tag}`);
