@@ -55,7 +55,7 @@ client.once(Events.ClientReady, async (c) => {
         isServerOnline = true; // Update state
         console.log("🟢 Server boot detected! Sending Discord announcement...");
 
-        const channel = await client.channels.fetch(ANNOUNCEMENT_CHANNEL_ID).catch(() => null);
+        const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
 
         if (channel) {
           const onlineNotificationEmbed = new EmbedBuilder()
