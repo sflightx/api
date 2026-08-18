@@ -6,6 +6,14 @@ dotenv.config();
 const { DISCORD_TOKEN } = process.env;
 const router = express.Router();
 
+app.get("/", (req, res) => {
+  res.status(200).json({ status: "online", message: "SFlightX and VoidCraft Discord Bot & API active!" });
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
+
 export const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
