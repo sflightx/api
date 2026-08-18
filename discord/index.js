@@ -127,7 +127,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setTitle("🟢 Server is ONLINE")
           .setDescription("The server is active and reachable.")
           .addFields(
-            { name: "📡 Address", value: `\`${host}:${port}\``, inline: true },
             { name: "⚡ Latency", value: `\`${duration}ms\``, inline: true },
             { name: "👥 Player", value: `\`${data.players.online} / ${data.players.max}\``, inline: true },
             { name: "🏷️ Version", value: `\`${data.version?.name || "Bedrock Edition"}\``, inline: false }
@@ -141,9 +140,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           .setColor(0xe74c3c) // Red status bar
           .setTitle("🔴 Server is OFFLINE")
           .setDescription(`Unable to establish a connection to \`${host}:${port}\`.`)
-          .addFields(
-            { name: "Server Address", value: `\`${host}:${port}\``, inline: true }
-          )
           .setFooter({ text: "VoidCraft SMP • Live Status" })
           .setTimestamp();
 
