@@ -5,6 +5,7 @@ import {
   REST,
   Routes,
   SlashCommandBuilder,
+  EmbedBuilder,
 } from "discord.js";
 import axios from "axios";
 import dotenv from "dotenv";
@@ -75,18 +76,36 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const data = response.data;
 
       if (data.online) {
-        await interaction.editReply(
-          `🟢 **Minecraft Server Online!**\n` +
-          `📡 **Address:** \`${host}:${port}\`\n` +
-          `⚡ **Latency:** \`${duration}ms\`\n` +
-          `👥 **Players:** \`${data.players.online}/${data.players.max}\`\n` +
-          `🏷️ **Version:** \`${data.version?.name || "Bedrock"}\``
-        );
+        const onlineEmbed = new EmbedBuilder()
+          .setColor(0x2ecc71) // Green status bar
+          .setTitle("🟢 Server is ONLINE")
+          .setDescription("The VoidCraft Minecraft Bedrock server is active and reachable.")
+          .addFields(
+            { name: "📡 Server", value: `\`${host}:${port}\``, inline: true },
+            { name: "⚡ Latency", value: `\`${duration}ms\``, inline: true },
+            { name: "👥 Player Count", value: `\`${data.players.online} / ${data.players.max}\``, inline: true },
+            { name: "🏷️ Server Version", value: `\`${data.version?.name || "Bedrock Edition"}\``, inline: false }
+          )
+          .setFooter({ text: "VoidCraft SMP • Live Status" })
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [onlineEmbed] });
       } else {
-        await interaction.editReply(`🔴 **Server Offline:** \`${host}:${port}\` is unreachable.`);
+        const offlineEmbed = new EmbedBuilder()
+          .setColor(0xe74c3c) // Red status bar
+          .setTitle("🔴 Server is OFFLINE")
+          .setDescription(`Unable to establish a connection to \`${host}:${port}\`.`)
+          .addFields(
+            { name: "Status", value: "Offline / Unreachable", inline: true },
+            { name: "Server Address", value: `\`${host}:${port}\``, inline: true }
+          )
+          .setFooter({ text: "VoidCraft SMP • Live Status" })
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [offlineEmbed] });
       }
     } catch (err) {
-      await interaction.editReply(`❌ **Failed to ping server:** Could not fetch status for \`${host}:${port}\`.`);
+      await interaction.editReply(`**Failed to ping server:** Could not fetch status for \`${host}:${port}\`.`);
     }
   }
 });
@@ -112,7 +131,7 @@ const loginWithRetry = async (retries = 5, delay = 5000) => {
       return; // Exit loop on success
     } catch (error) {
       console.error(`❌ Login attempt ${i + 1} failed:`, error.message);
-      
+
       // If rate limited (HTTP 429), wait before retrying
       if (error.status === 429 || error.message.includes("429")) {
         console.warn(`⏳ Rate-limited by Discord. Retrying in ${delay / 1000}s...`);
