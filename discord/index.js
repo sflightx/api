@@ -15,26 +15,49 @@ app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
+const commands = [
+  new SlashCommandBuilder()
+    .setName("status")
+    .setDescription("Check status of the server and player count.")
+].map(command => command.toJSON());
+
 export const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
+  intents: [GatewayIntentBits.Guilds]
 });
 
-client.once(Events.ClientReady, (c) => {
+//register ping commands
+client.once(Events.ClientReady, async (c) => {
   console.log(`Ready! Logged in as ${c.user.tag}`);
+
+  const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
+
+  try {
+    console.log("Started refreshing application (/) commands.");
+
+    await rest.put(
+      Routes.applicationCommands(CLIENT_ID || c.user.id),
+      { body: commands }
+    );
+
+    console.log("Successfully reloaded application (/) commands.");
+  } catch (error) {
+    console.error("Failed to register slash commands:", error);
+  }
 });
 
-client.on(Events.MessageCreate, async (message) => {
-  if (message.author.bot) return;
+client.on(Events.InteractionCreate, async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
 
-  const command = message.content.trim().toLowerCase();
+  const { commandName } = interaction;
 
-  if (command === "!ping") {
+  // Handle /status command
+  if (commandName === "status") {
+    // Acknowledge the interaction immediately to prevent 3-second timeouts
+    await interaction.deferReply();
+
     const host = MC_SERVER_IP || "voidcraftsmp.mcsh.io";
     const port = MC_SERVER_PORT || 19132;
+    const startTime = Date.now();
 
     try {
       const response = await axios.get(`https://api.mcstatus.io/v2/status/bedrock/${host}:${port}`);
@@ -42,7 +65,7 @@ client.on(Events.MessageCreate, async (message) => {
       const data = response.data;
 
       if (data.online) {
-        await initialMsg.edit(
+        await interaction.editReply(
           `🟢 **Minecraft Server Online!**\n` +
           `📡 **Address:** \`${host}:${port}\`\n` +
           `⚡ **Latency:** \`${duration}ms\`\n` +
@@ -50,10 +73,10 @@ client.on(Events.MessageCreate, async (message) => {
           `🏷️ **Version:** \`${data.version?.name || "Bedrock"}\``
         );
       } else {
-        await initialMsg.edit(`🔴 **Server Offline:** \`${host}:${port}\` is unreachable.`);
+        await interaction.editReply(`🔴 **Server Offline:** \`${host}:${port}\` is unreachable.`);
       }
     } catch (err) {
-      await initialMsg.edit(`❌ **Failed to ping server:** Could not fetch status for \`${host}:${port}\`.`);
+      await interaction.editReply(`❌ **Failed to ping server:** Could not fetch status for \`${host}:${port}\`.`);
     }
   }
 });
