@@ -3,6 +3,7 @@ import cors from "cors";
 
 //import growAGardenRouter from "./grow_a_garden/index.js";
 import discordRouter from "./discord/index.js";
+import minecraftRouter from "./minecraft/index.js";
 
 import appRouter from "./app/index.js";
 import appUserRouter from "./app/user/index.js";
