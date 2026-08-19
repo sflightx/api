@@ -63,8 +63,8 @@ client.once(Events.ClientReady, async (c) => {
             .setTitle("Server is now ONLINE!")
             .setDescription("The server is available for players to join.")
             .addFields(
-              { name: "📡 Address", value: `\`${host}:${port}\``, inline: true },
               { name: "🏷️ Version", value: `\`${data.version?.name || "Bedrock Edition"}\``, inline: true },
+              { name: "👥 Player", value: `\`${data.players.online} / ${data.players.max}\``, inline: true },
             )
             .setFooter({ text: "Automated Server Status Watcher" })
             .setTimestamp();
@@ -139,14 +139,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const offlineEmbed = new EmbedBuilder()
           .setColor(0xe74c3c) // Red status bar
           .setTitle("🔴 Server is OFFLINE")
-          .setDescription(`Unable to establish a connection to \`${host}:${port}\`.`)
+          .setDescription(`Unable to establish a connection to the server.`)
           .setFooter({ text: "VoidCraft SMP • Live Status" })
           .setTimestamp();
 
         await interaction.editReply({ embeds: [offlineEmbed] });
       }
     } catch (err) {
-      await interaction.editReply(`**Failed to ping server:** Could not fetch status for \`${host}:${port}\`.`);
+      await interaction.editReply(`**Failed to ping server:** Could not fetch server status.`);
     }
   }
 });
