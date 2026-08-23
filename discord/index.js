@@ -22,6 +22,9 @@ const {
   MC_SERVER_PORT,
   CHANNEL_ID,
   PORT = 3000,
+  PANEL_URL,
+  API_KEY,
+  SERVER_ID,
 } = process.env;
 
 // Initialize Express and HTTP Server
@@ -66,12 +69,42 @@ app.post("/v1/broadcast", (req, res) => {
   res.json({ success: true, clients: clients.size });
 });
 
-function connectToMCServerHost() {
-  const wsUrl = process.env.WEBSOCKET_URL;
-  const pteroToken = process.env.WEBSOCKET_TOKEN;
+// Helper to fetch dynamic fresh WebSocket credentials via Pterodactyl API
+async function fetchPteroCredentials() {
+  if (!PANEL_URL || !API_KEY || !SERVER_ID) {
+    return null;
+  }
+
+  try {
+    console.log("🔑 Requesting fresh WebSocket token from Pterodactyl API...");
+    const endpoint = `${PANEL_URL.replace(/\/$/, "")}/api/client/servers/${SERVER_ID}/websocket`;
+    const response = await axios.get(endpoint, {
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        Accept: "application/json",
+      },
+    });
+
+    const { socket, token } = response.data.data;
+    console.log("✅ Successfully generated fresh Pterodactyl token!");
+    return { wsUrl: socket, pteroToken: token };
+  } catch (error) {
+    console.error("❌ Failed to fetch dynamic WS token from Pterodactyl API:", error.message);
+    return null;
+  }
+}
+
+async function connectToMCServerHost() {
+  // 1. Try dynamic token fetch first
+  let creds = await fetchPteroCredentials();
+
+  // 2. Fall back to static environment variables
+  let wsUrl = creds?.wsUrl || process.env.WEBSOCKET_URL;
+  let pteroToken = creds?.pteroToken || process.env.WEBSOCKET_TOKEN || process.env.PTERO_TOKEN;
 
   if (!wsUrl || !pteroToken) {
-    console.warn("⚠️ WEBSOCKET_URL or PTERO_TOKEN is missing!");
+    console.warn("⚠️ WEBSOCKET_URL or PTERO_TOKEN is missing! Retrying connection in 15s...");
+    setTimeout(connectToMCServerHost, 15000);
     return;
   }
 
@@ -81,7 +114,7 @@ function connectToMCServerHost() {
   mcSocket.on("open", () => {
     console.log("🟢 Connected! Injecting authentication token payload...");
     
-    // Inject the static token payload
+    // Inject token payload
     const authPayload = JSON.stringify({
       event: "auth",
       args: [pteroToken]
@@ -98,6 +131,13 @@ function connectToMCServerHost() {
         console.log("✅ Token Auth Accepted by MCServerHost!");
       }
 
+      // Handle token expiration errors from Pterodactyl
+      if (parsed.event === "jwt error") {
+        console.error("❌ Pterodactyl Token Expired (JWT Error):", parsed.args?.[0]);
+        mcSocket.close();
+        return;
+      }
+
       if (parsed.event === "console output" && parsed.args && parsed.args[0]) {
         parseBedrockConsoleLine(parsed.args[0]);
       }
@@ -108,7 +148,7 @@ function connectToMCServerHost() {
 
   mcSocket.on("error", (err) => console.error("❌ WS Error:", err.message));
   mcSocket.on("close", () => {
-    console.warn("🔴 WS disconnected. Reconnecting in 10s...");
+    console.warn("🔴 WS disconnected. Reconnecting with fresh token in 10s...");
     setTimeout(connectToMCServerHost, 10000);
   });
 }
@@ -132,7 +172,7 @@ async function parseBedrockConsoleLine(line) {
     return null;
   });
 
-  // 2. CAPTURE PLAYER CONNECTS: "[Timestamp INFO] Player connected: edrek0729, xuid: ..."
+  // 2. CAPTURE PLAYER CONNECTS
   if (cleanLine.includes("Player connected:")) {
     const username = cleanLine.split("Player connected:")[1].split(",")[0].trim();
     
@@ -143,12 +183,11 @@ async function parseBedrockConsoleLine(line) {
       console.log(`📤 [Discord Sent] Announced JOIN for ${username}`);
     }
 
-    // Broadcast event to api.sflightx.com subscribers
     broadcastToClients({ type: "PLAYER_JOIN", username });
     return;
   }
 
-  // 3. CAPTURE PLAYER DISCONNECTS: "[Timestamp INFO] Player disconnected: edrek0729, xuid: ..."
+  // 3. CAPTURE PLAYER DISCONNECTS
   if (cleanLine.includes("Player disconnected:")) {
     const username = cleanLine.split("Player disconnected:")[1].split(",")[0].trim();
     
@@ -159,23 +198,21 @@ async function parseBedrockConsoleLine(line) {
       console.log(`📤 [Discord Sent] Announced LEAVE for ${username}`);
     }
 
-    // Broadcast event to api.sflightx.com subscribers
     broadcastToClients({ type: "PLAYER_LEAVE", username });
     return;
   }
 
-  // 4. CAPTURE IN-GAME CHAT: Matches "<Username> Message"
-  const chatMatch = cleanLine.match(/<([^>]+)>\s*(.+)/);
-  if (chatMatch) {
-    const player = chatMatch[1];
-    const message = chatMatch[2];
-    
-    console.log(`✅ [API Event] Captured CHAT from ${player}: "${message}"`);
+  // 4. CAPTURE SCRIPT API IN-GAME CHAT LOGS (`[SCRIPT_CHAT] <Player> Message`)
+  if (cleanLine.includes("[SCRIPT_CHAT]")) {
+    const chatContent = cleanLine.split("[SCRIPT_CHAT]")[1].trim();
+    console.log(`✅ [API Event] Captured SCRIPT CHAT: "${chatContent}"`);
 
     if (channel) {
-      await channel.send(`💬 **[In-Game] ${player}:** ${message}`);
-      console.log(`📤 [Discord Sent] Forwarded chat message from ${player}`);
+      await channel.send(`💬 **[In-Game]** ${chatContent}`);
+      console.log(`📤 [Discord Sent] Forwarded chat message`);
     }
+
+    broadcastToClients({ type: "IN_GAME_CHAT", message: chatContent });
     return;
   }
 
@@ -183,12 +220,12 @@ async function parseBedrockConsoleLine(line) {
   const deathKeywords = [
     "was slain by", "drowned", "fell from a high place", "blew up",
     "burned to death", "tried to swim in lava", "was killed by", 
-    "starved to death", "suffocated in a wall", "hit the ground too hard"
+    "starved to death", "suffocated in a wall", "hit the ground too hard",
+    "[SCRIPT_DEATH]"
   ];
 
   if (deathKeywords.some(keyword => cleanLine.includes(keyword))) {
-    // Clean out timestamp prefix for Discord display
-    const cleanDeathMessage = cleanLine.replace(/^\[.*?\]\s*/, "");
+    const cleanDeathMessage = cleanLine.replace(/^\[.*?\]\s*/, "").replace("[SCRIPT_DEATH]", "").trim();
     
     console.log(`✅ [API Event] Captured DEATH log: "${cleanDeathMessage}"`);
 
@@ -197,7 +234,6 @@ async function parseBedrockConsoleLine(line) {
       console.log(`📤 [Discord Sent] Sent Death Alert to Discord`);
     }
 
-    // Broadcast death out to api.sflightx.com subscribers
     broadcastToClients({ type: "PLAYER_DEATH", message: cleanDeathMessage });
   }
 }
