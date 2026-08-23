@@ -114,38 +114,62 @@ function connectToMCServerHost() {
   });
 }
 
-// Console Log Parser for Bedrock Death & Chat Messages
 async function parseBedrockConsoleLine(line) {
   if (!CHANNEL_ID) return;
 
-  // Clean ANSI color escape sequences from server logs
+  // 1. Clean ANSI color escape sequences and trim line
   const cleanLine = line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "").trim();
 
-  // 1. Detect Player Death Messages
+  // Ignore system noise/startup lines
+  if (!cleanLine || cleanLine.includes("NO_TRANSLATE")) return;
+
+  const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
+  if (!channel) return;
+
+  // 2. CAPTURE PLAYER CONNECTS: "Player connected: ItzW4rden, xuid: ..."
+  if (cleanLine.startsWith("Player connected:")) {
+    const username = cleanLine.split("Player connected:")[1].split(",")[0].trim();
+    
+    await channel.send(`📥 **${username}** joined the server.`);
+    
+    // Broadcast event to api.sflightx.com subscribers
+    broadcastToClients({ type: "PLAYER_JOIN", username });
+    return;
+  }
+
+  // 3. CAPTURE PLAYER DISCONNECTS: "Player disconnected: edrek0729, xuid: ..."
+  if (cleanLine.startsWith("Player disconnected:")) {
+    const username = cleanLine.split("Player disconnected:")[1].split(",")[0].trim();
+    
+    await channel.send(`📤 **${username}** left the server.`);
+    
+    // Broadcast event to api.sflightx.com subscribers
+    broadcastToClients({ type: "PLAYER_LEAVE", username });
+    return;
+  }
+
+  // 4. CAPTURE IN-GAME CHAT: Matches "<Username> Message"
+  const chatMatch = cleanLine.match(/<([^>]+)>\s*(.+)/);
+  if (chatMatch) {
+    const player = chatMatch[1];
+    const message = chatMatch[2];
+    
+    await channel.send(`💬 **[In-Game] ${player}:** ${message}`);
+    return;
+  }
+
+  // 5. CAPTURE DEATH MESSAGES
   const deathKeywords = [
     "was slain by", "drowned", "fell from a high place", "blew up",
-    "burned to death", "tried to swim in lava", "was killed by", "starved to death"
+    "burned to death", "tried to swim in lava", "was killed by", 
+    "starved to death", "suffocated in a wall", "hit the ground too hard"
   ];
 
   if (deathKeywords.some(keyword => cleanLine.includes(keyword))) {
-    const deathPayload = { type: "PLAYER_DEATH", message: cleanLine };
+    await channel.send(`☠️ **Death Alert:** \`${cleanLine}\``);
     
-    // Send to Discord
-    const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
-    if (channel) {
-      await channel.send(`☠️ **Death Alert:** \`${cleanLine}\``);
-    }
-    
-    // Broadcast out to api.sflightx.com WebSocket subscribers
-    broadcastToClients(deathPayload);
-  }
-
-  // 2. Detect Player Chat Messages
-  if (cleanLine.includes("Player Spawned") || (cleanLine.includes("<") && cleanLine.includes(">"))) {
-    const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
-    if (channel) {
-      await channel.send(`💬 ${cleanLine}`);
-    }
+    // Broadcast death out to api.sflightx.com subscribers
+    broadcastToClients({ type: "PLAYER_DEATH", message: cleanLine });
   }
 }
 
