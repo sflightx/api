@@ -21,6 +21,8 @@ const {
   MC_SERVER_IP,
   MC_SERVER_PORT,
   CHANNEL_ID,
+  WEBSOCKET_URL, // Your MCServerHost / Pterodactyl WS URL
+  PTERO_TOKEN,   // Optional: token if required separately by panel
   PORT = 3000,
 } = process.env;
 
@@ -30,33 +32,27 @@ app.use(express.json());
 
 const server = http.createServer(app);
 
-// Initialize WebSocket Server on /v1/stream
+// Initialize WebSocket Server on /v1/stream for api.sflightx.com clients
 const wss = new WebSocketServer({ server, path: "/v1/stream" });
 const clients = new Set();
 
 wss.on("connection", (ws) => {
   clients.add(ws);
-  console.log("🟢 Client connected to api.sflightx.com stream");
+  console.log("🟢 External client connected to api.sflightx.com stream");
 
   ws.on("message", async (message) => {
     try {
       const payload = JSON.parse(message.toString());
-      console.log("Received WS payload:", payload);
-
-      // Route WebSocket events directly to Discord
       await handleIncomingWsEvent(payload);
     } catch (err) {
       console.log("Received raw WS text:", message.toString());
     }
   });
 
-  ws.on("close", () => {
-    clients.delete(ws);
-    console.log("🔴 Client disconnected from stream");
-  });
+  ws.on("close", () => clients.delete(ws));
 });
 
-// Helper: Broadcast data out to connected WebSocket clients
+// Helper: Broadcast data out to external clients listening on api.sflightx.com
 function broadcastToClients(data) {
   const payload = JSON.stringify(data);
   clients.forEach((client) => {
@@ -66,11 +62,92 @@ function broadcastToClients(data) {
   });
 }
 
-// REST Endpoint to trigger updates via HTTP POST
 app.post("/v1/broadcast", (req, res) => {
   broadcastToClients(req.body);
+  handleIncomingWsEvent(req.body);
   res.json({ success: true, clients: clients.size });
 });
+
+// ==========================================
+// PTERODACTYL / MCSERVERHOST WEBSOCKET BRIDGE
+// ==========================================
+function connectToMCServerHost() {
+  if (!WEBSOCKET_URL) {
+    console.warn("⚠️ WEBSOCKET_URL is missing in Render environment variables!");
+    return;
+  }
+
+  console.log("🔌 Connecting to MCServerHost Console WebSocket...");
+  const mcSocket = new WebSocket(WEBSOCKET_URL);
+
+  mcSocket.on("open", () => {
+    console.log("🟢 Connected to MCServerHost WebSocket!");
+    
+    // Authenticate with Pterodactyl if token is provided
+    if (PTERO_TOKEN) {
+      mcSocket.send(JSON.stringify({ event: "auth", args: [PTERO_TOKEN] }));
+    }
+  });
+
+  mcSocket.on("message", async (data) => {
+    try {
+      const parsed = JSON.parse(data.toString());
+
+      // Pterodactyl console logs arrive under event "console output"
+      if (parsed.event === "console output" && parsed.args && parsed.args[0]) {
+        const logLine = parsed.args[0];
+        await parseBedrockConsoleLine(logLine);
+      }
+    } catch (err) {
+      // Raw string output fallback
+      await parseBedrockConsoleLine(data.toString());
+    }
+  });
+
+  mcSocket.on("error", (err) => {
+    console.error("❌ MCServerHost WebSocket error:", err.message);
+  });
+
+  mcSocket.on("close", () => {
+    console.warn("🔴 MCServerHost WebSocket disconnected. Retrying in 10s...");
+    setTimeout(connectToMCServerHost, 10000); // Auto-reconnect
+  });
+}
+
+// Console Log Parser for Bedrock Death & Chat Messages
+async function parseBedrockConsoleLine(line) {
+  if (!CHANNEL_ID) return;
+
+  // Clean ANSI color escape sequences from server logs
+  const cleanLine = line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "").trim();
+
+  // 1. Detect Player Death Messages
+  const deathKeywords = [
+    "was slain by", "drowned", "fell from a high place", "blew up",
+    "burned to death", "tried to swim in lava", "was killed by", "starved to death"
+  ];
+
+  if (deathKeywords.some(keyword => cleanLine.includes(keyword))) {
+    const deathPayload = { type: "PLAYER_DEATH", message: cleanLine };
+    
+    // Send to Discord
+    const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
+    if (channel) {
+      await channel.send(`☠️ **Death Alert:** \`${cleanLine}\``);
+    }
+    
+    // Broadcast out to api.sflightx.com WebSocket subscribers
+    broadcastToClients(deathPayload);
+  }
+
+  // 2. Detect Player Chat Messages
+  if (cleanLine.includes("Player Spawned") || (cleanLine.includes("<") && cleanLine.includes(">"))) {
+    const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
+    if (channel) {
+      await channel.send(`💬 ${cleanLine}`);
+    }
+  }
+}
 
 // 1. Define Slash Commands
 const commands = [
@@ -79,7 +156,6 @@ const commands = [
     .setDescription("Check status of the server and player count."),
 ].map((command) => command.toJSON());
 
-// Register Slash Commands Function
 async function registerSlashCommands() {
   if (!DISCORD_TOKEN || !CLIENT_ID) return;
   const rest = new REST({ version: "10" }).setToken(DISCORD_TOKEN);
@@ -97,27 +173,21 @@ export const client = new Client({
   intents: [GatewayIntentBits.Guilds],
   presence: {
     status: "online",
-    activities: [
-      {
-        name: "Checking status of VoidCraft SMP",
-        type: 0, // Playing
-      },
-    ],
+    activities: [{ name: "VoidCraft SMP Console", type: 0 }],
   },
 });
 
 let isServerOnline = false;
 
-// Function to handle incoming events from WS (Deaths, Chat, Inflation)
+// Handle events pushed manually or via /v1/broadcast
 async function handleIncomingWsEvent(payload) {
   if (!CHANNEL_ID) return;
   const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
   if (!channel) return;
 
-  // Event 1: Inflation / Economy Updates
   if (payload.type === "INFLATION_UPDATE") {
     const inflationEmbed = new EmbedBuilder()
-      .setColor(0xf1c40f) // Gold
+      .setColor(0xf1c40f)
       .setTitle("📊 Market Inflation Update")
       .setDescription(`Current Rate: **${payload.rate}%**`)
       .addFields({ name: "Shift", value: `${payload.change || "0"}%`, inline: true })
@@ -126,25 +196,18 @@ async function handleIncomingWsEvent(payload) {
 
     await channel.send({ embeds: [inflationEmbed] });
   }
-
-  // Event 2: Minecraft Player Death Event
-  if (payload.type === "PLAYER_DEATH") {
-    await channel.send(`☠️ **Death Alert:** ${payload.message || "A player has died!"}`);
-  }
-
-  // Event 3: In-game Chat Message Bridging
-  if (payload.type === "IN_GAME_CHAT") {
-    await channel.send(`💬 **[In-Game] ${payload.username}:** ${payload.message}`);
-  }
 }
 
-// 3. Register Slash Commands & Watcher on Ready
+// 3. Ready Event
 client.once(Events.ClientReady, async (c) => {
   console.log(`🤖 Discord Bot Ready! Logged in as ${c.user.tag}`);
   await registerSlashCommands();
+  
+  // Start the Pterodactyl console listener
+  connectToMCServerHost();
 
-  const CHECK_INTERVAL = 30 * 1000; // 30 seconds
-
+  // Status Watcher Poller
+  const CHECK_INTERVAL = 30 * 1000;
   setInterval(async () => {
     const host = MC_SERVER_IP || "15.235.144.117";
     const port = MC_SERVER_PORT || 14902;
@@ -155,11 +218,8 @@ client.once(Events.ClientReady, async (c) => {
       );
       const data = response.data;
 
-      // STATE TRANSITION: Server ONLINE
       if (data.online && !isServerOnline) {
         isServerOnline = true;
-        console.log("🟢 Server boot detected! Sending Discord announcement...");
-
         const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
         if (channel) {
           const onlineEmbed = new EmbedBuilder()
@@ -175,18 +235,14 @@ client.once(Events.ClientReady, async (c) => {
 
           await channel.send({ embeds: [onlineEmbed] });
         }
-      } 
-      // STATE TRANSITION: Server OFFLINE
-      else if (!data.online && isServerOnline) {
+      } else if (!data.online && isServerOnline) {
         isServerOnline = false;
-        console.log("🔴 Server shutdown detected.");
-
         const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
         if (channel) {
           const offlineEmbed = new EmbedBuilder()
             .setColor(0xe74c3c)
             .setTitle("Server just went OFFLINE")
-            .setDescription("Contact an admin. It may be undergoing maintenance or experiencing issues.")
+            .setDescription("Contact an admin regarding server status.")
             .setFooter({ text: "Automated Server Status Watcher" })
             .setTimestamp();
 
@@ -199,7 +255,7 @@ client.once(Events.ClientReady, async (c) => {
   }, CHECK_INTERVAL);
 });
 
-// 4. Slash Command Interactions
+// 4. Interaction Handler
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -247,11 +303,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// Unhandled Errors
+// Error handling
 process.on("unhandledRejection", (reason) => console.error("Unhandled Rejection:", reason));
 process.on("uncaughtException", (err) => console.error("Uncaught Exception:", err));
 
-// 5. Start HTTP/WebSocket Server and Login Bot
+// 5. Start Server
 server.listen(PORT, () => {
   console.log(`🚀 API & WebSocket Server running on port ${PORT}`);
 });
@@ -261,7 +317,6 @@ const loginWithRetry = async (retries = 5, delay = 5000) => {
     try {
       console.log(`🔑 Logging into Discord (Attempt ${i + 1}/${retries})...`);
       await client.login(DISCORD_TOKEN);
-      console.log("Connected successfully!");
       return;
     } catch (error) {
       console.error(`Login attempt ${i + 1} failed:`, error.message);
