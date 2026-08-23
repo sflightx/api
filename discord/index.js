@@ -21,8 +21,6 @@ const {
   MC_SERVER_IP,
   MC_SERVER_PORT,
   CHANNEL_ID,
-  WEBSOCKET_URL, // Your MCServerHost / Pterodactyl WS URL
-  PTERO_TOKEN,   // Optional: token if required separately by panel
   PORT = 3000,
 } = process.env;
 
@@ -68,54 +66,58 @@ app.post("/v1/broadcast", (req, res) => {
   res.json({ success: true, clients: clients.size });
 });
 
-// ==========================================
-// PTERODACTYL / MCSERVERHOST WEBSOCKET BRIDGE
-// ==========================================
 function connectToMCServerHost() {
-  if (!WEBSOCKET_URL) {
-    console.warn("⚠️ WEBSOCKET_URL is missing in Render environment variables!");
+  const wsUrl = process.env.WEBSOCKET_URL;
+  const pteroToken = process.env.WEBSOCKET_TOKEN;
+
+  if (!wsUrl || !pteroToken) {
+    console.warn("⚠️ WEBSOCKET_URL or PTERO_TOKEN is missing!");
     return;
   }
 
-  console.log("🔌 Connecting to MCServerHost Console WebSocket...");
-  const mcSocket = new WebSocket(WEBSOCKET_URL);
+  console.log("🔌 Connecting to MCServerHost WebSocket...");
+  const mcSocket = new WebSocket(wsUrl);
 
   mcSocket.on("open", () => {
-    console.log("🟢 Connected to MCServerHost WebSocket!");
+    console.log("🟢 Connected! Injecting authentication token payload...");
     
-    // Authenticate with Pterodactyl if token is provided
-    if (PTERO_TOKEN) {
-      mcSocket.send(JSON.stringify({ event: "auth", args: [PTERO_TOKEN] }));
-    }
+    // Inject the static token payload
+    const authPayload = JSON.stringify({
+      event: "auth",
+      args: [pteroToken]
+    });
+
+    mcSocket.send(authPayload);
   });
 
-  mcSocket.on("message", async (data) => {
+  mcSocket.on("message", (data) => {
     try {
       const parsed = JSON.parse(data.toString());
 
-      // Pterodactyl console logs arrive under event "console output"
+      if (parsed.event === "auth success") {
+        console.log("✅ Token Auth Accepted by MCServerHost!");
+      }
+
       if (parsed.event === "console output" && parsed.args && parsed.args[0]) {
-        const logLine = parsed.args[0];
-        await parseBedrockConsoleLine(logLine);
+        parseBedrockConsoleLine(parsed.args[0]);
       }
     } catch (err) {
-      // Raw string output fallback
-      await parseBedrockConsoleLine(data.toString());
+      parseBedrockConsoleLine(data.toString());
     }
   });
 
-  mcSocket.on("error", (err) => {
-    console.error("❌ MCServerHost WebSocket error:", err.message);
-  });
-
+  mcSocket.on("error", (err) => console.error("❌ WS Error:", err.message));
   mcSocket.on("close", () => {
-    console.warn("🔴 MCServerHost WebSocket disconnected. Retrying in 10s...");
-    setTimeout(connectToMCServerHost, 10000); // Auto-reconnect
+    console.warn("🔴 WS disconnected. Reconnecting in 10s...");
+    setTimeout(connectToMCServerHost, 10000);
   });
 }
 
 async function parseBedrockConsoleLine(line) {
-  if (!CHANNEL_ID) return;
+  if (!CHANNEL_ID) {
+    console.error("No Channel ID Available.");
+    return;
+  }
 
   // 1. Clean ANSI color escape sequences and trim line
   const cleanLine = line.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, "").trim();
