@@ -123,16 +123,15 @@ async function parseBedrockConsoleLine(line) {
   // Ignore system noise or startup lines
   if (!cleanLine || cleanLine.includes("NO_TRANSLATE")) return;
 
-  // Log raw captured console output for debugging
   console.log(`[MC RAW LOG] ${cleanLine}`);
 
   const channel = await client.channels.fetch(CHANNEL_ID).catch((err) => {
-    console.error(`❌ [Discord Fetch Error] Could not fetch channel ID ${CHANNEL_ID}:`, err.message);
+    console.error(`❌ [Discord Fetch Error] Could not fetch channel:`, err.message);
     return null;
   });
 
-  // 2. CAPTURE PLAYER CONNECTS: "Player connected: ItzW4rden, xuid: ..."
-  if (cleanLine.startsWith("Player connected:")) {
+  // 2. CAPTURE PLAYER CONNECTS: "[Timestamp INFO] Player connected: edrek0729, xuid: ..."
+  if (cleanLine.includes("Player connected:")) {
     const username = cleanLine.split("Player connected:")[1].split(",")[0].trim();
     
     console.log(`✅ [API Event] Captured JOIN event for player: ${username}`);
@@ -144,12 +143,11 @@ async function parseBedrockConsoleLine(line) {
 
     // Broadcast event to api.sflightx.com subscribers
     broadcastToClients({ type: "PLAYER_JOIN", username });
-    console.log(`📡 [WS Broadcast] Sent PLAYER_JOIN to ${clients.size} connected WebSocket clients`);
     return;
   }
 
-  // 3. CAPTURE PLAYER DISCONNECTS: "Player disconnected: edrek0729, xuid: ..."
-  if (cleanLine.startsWith("Player disconnected:")) {
+  // 3. CAPTURE PLAYER DISCONNECTS: "[Timestamp INFO] Player disconnected: edrek0729, xuid: ..."
+  if (cleanLine.includes("Player disconnected:")) {
     const username = cleanLine.split("Player disconnected:")[1].split(",")[0].trim();
     
     console.log(`✅ [API Event] Captured LEAVE event for player: ${username}`);
@@ -161,7 +159,6 @@ async function parseBedrockConsoleLine(line) {
 
     // Broadcast event to api.sflightx.com subscribers
     broadcastToClients({ type: "PLAYER_LEAVE", username });
-    console.log(`📡 [WS Broadcast] Sent PLAYER_LEAVE to ${clients.size} connected WebSocket clients`);
     return;
   }
 
@@ -188,16 +185,18 @@ async function parseBedrockConsoleLine(line) {
   ];
 
   if (deathKeywords.some(keyword => cleanLine.includes(keyword))) {
-    console.log(`✅ [API Event] Captured DEATH log: "${cleanLine}"`);
+    // Clean out timestamp prefix for Discord display
+    const cleanDeathMessage = cleanLine.replace(/^\[.*?\]\s*/, "");
+    
+    console.log(`✅ [API Event] Captured DEATH log: "${cleanDeathMessage}"`);
 
     if (channel) {
-      await channel.send(`☠️ **Death Alert:** \`${cleanLine}\``);
+      await channel.send(`☠️ **Death Alert:** \`${cleanDeathMessage}\``);
       console.log(`📤 [Discord Sent] Sent Death Alert to Discord`);
     }
 
     // Broadcast death out to api.sflightx.com subscribers
-    broadcastToClients({ type: "PLAYER_DEATH", message: cleanLine });
-    console.log(`📡 [WS Broadcast] Sent PLAYER_DEATH to ${clients.size} connected WebSocket clients`);
+    broadcastToClients({ type: "PLAYER_DEATH", message: cleanDeathMessage });
   }
 }
 
