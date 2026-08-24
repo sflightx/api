@@ -2,17 +2,26 @@ import {
   Client,
   GatewayIntentBits,
   Events,
-  SlashCommandBuilder,
   EmbedBuilder,
 } from "discord.js";
 import axios from "axios";
 import dotenv from "dotenv";
+import http from "http";
 
 dotenv.config();
 
 const { DISCORD_TOKEN, MC_SERVER_IP, MC_SERVER_PORT, CHANNEL_ID } = process.env;
 
-// Initialize Discord Client
+// 1. Keep-Alive Server for Render Free Tier (Binds to PORT environment variable)
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("VoidCraft Discord Bot is active!");
+}).listen(PORT, () => {
+  console.log(`🌐 Keep-alive server listening on port ${PORT}`);
+});
+
+// 2. Initialize Discord Client
 export const client = new Client({
   intents: [GatewayIntentBits.Guilds],
   presence: {
@@ -28,29 +37,43 @@ export const client = new Client({
 
 let isServerOnline = false;
 
-// Register Slash Commands on Ready
+// 3. Register Slash Commands & Polling on Ready
 client.once(Events.ClientReady, async (c) => {
   console.log(`🤖 Discord Bot Ready! Logged in as ${c.user.tag}`);
 
   // Fetch target channel ONCE on startup and cache it
-  const channel = await client.channels.fetch(CHANNEL_ID).catch((err) => {
-    console.error("❌ Failed to fetch Discord channel:", err.message);
-    return null;
-  });
+  let channel = null;
+  if (CHANNEL_ID) {
+    channel = await client.channels.fetch(CHANNEL_ID).catch((err) => {
+      console.error("❌ Failed to fetch Discord channel:", err.message);
+      return null;
+    });
+  }
 
+  const host = MC_SERVER_IP || "15.235.144.117";
+  const port = MC_SERVER_PORT || 14902;
   const CHECK_INTERVAL = 30 * 1000; // 30 seconds
 
-  setInterval(async () => {
-    const host = MC_SERVER_IP || "15.235.144.117";
-    const port = MC_SERVER_PORT || 14902;
+  // Initialize status on startup without triggering a false online notification
+  try {
+    const initialCheck = await axios.get(
+      `https://api.mcstatus.io/v2/status/bedrock/${host}:${port}`
+    );
+    isServerOnline = initialCheck.data.online;
+    console.log(`📡 Initial server state captured: ${isServerOnline ? "ONLINE" : "OFFLINE"}`);
+  } catch (e) {
+    console.warn("⚠️ Could not fetch initial status. Defaulting to OFFLINE state.");
+  }
 
+  // Interval polling
+  setInterval(async () => {
     try {
       const response = await axios.get(
         `https://api.mcstatus.io/v2/status/bedrock/${host}:${port}`
       );
       const data = response.data;
 
-      // 1. STATE TRANSITION: Server came ONLINE
+      // STATE TRANSITION: Server came ONLINE
       if (data.online && !isServerOnline) {
         isServerOnline = true;
         console.log("🟢 Server boot detected! Sending Discord announcement...");
@@ -78,7 +101,7 @@ client.once(Events.ClientReady, async (c) => {
           await channel.send({ embeds: [onlineNotificationEmbed] });
         }
       }
-      // 2. STATE TRANSITION: Server went OFFLINE
+      // STATE TRANSITION: Server went OFFLINE
       else if (!data.online && isServerOnline) {
         isServerOnline = false;
         console.log("🔴 Server shutdown detected.");
@@ -102,7 +125,7 @@ client.once(Events.ClientReady, async (c) => {
   }, CHECK_INTERVAL);
 });
 
-// Interaction Handler
+// 4. Interaction Handler
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -160,7 +183,17 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// Process Error Guardrails
+// 5. Discord Connection Event Listeners
+client.on(Events.Error, (err) => console.error("⚠️ Discord Client Error:", err.message));
+client.on(Events.Warn, (info) => console.warn("⚠️ Discord Client Warning:", info));
+
+client.rest.on("rateLimited", (rateLimitInfo) => {
+  console.warn(
+    `⏳ REST Rate limited on route ${rateLimitInfo.route}. Retrying in ${rateLimitInfo.timeToReset}ms...`
+  );
+});
+
+// 6. Process Error Guardrails
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
 });
@@ -169,11 +202,26 @@ process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception thrown:", err);
 });
 
-// Simple Login
-if (DISCORD_TOKEN) {
-  client.login(DISCORD_TOKEN).catch((err) => {
-    console.error("❌ Login failed:", err.message);
-  });
-} else {
-  console.error("❌ DISCORD_TOKEN is missing in environment variables!");
-}
+// 7. Login Execution with Exponential Backoff
+const connectWithRetry = async (delay = 5000, maxDelay = 300000) => {
+  if (!DISCORD_TOKEN) {
+    console.error("❌ DISCORD_TOKEN is missing in environment variables!");
+    return;
+  }
+
+  try {
+    console.log("🔑 Attempting client.login()...");
+    await client.login(DISCORD_TOKEN);
+  } catch (error) {
+    console.error("❌ Login failed:", error.message);
+
+    if (error.status === 429 || error.message.includes("429")) {
+      console.warn(`⏳ Cloudflare Rate-limited. Retrying connection in ${delay / 1000}s...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      const nextDelay = Math.min(delay * 2, maxDelay);
+      return connectWithRetry(nextDelay, maxDelay);
+    }
+  }
+};
+
+connectWithRetry();
