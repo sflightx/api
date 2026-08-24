@@ -148,8 +148,8 @@ async function connectToMCServerHost() {
 
   mcSocket.on("error", (err) => console.error("❌ WS Error:", err.message));
   mcSocket.on("close", () => {
-    console.warn("🔴 WS disconnected. Reconnecting with fresh token in 10s...");
-    setTimeout(connectToMCServerHost, 10000);
+    console.warn("🔴 WS disconnected.");
+    //setTimeout(connectToMCServerHost, 10000);
   });
 }
 
