@@ -37,18 +37,9 @@ export const client = new Client({
 
 let isServerOnline = false;
 
-// 3. Register Slash Commands & Polling on Ready
+// 3. Polling & Status Watcher on Ready
 client.once(Events.ClientReady, async (c) => {
   console.log(`🤖 Discord Bot Ready! Logged in as ${c.user.tag}`);
-
-  // Fetch target channel ONCE on startup and cache it
-  let channel = null;
-  if (CHANNEL_ID) {
-    channel = await client.channels.fetch(CHANNEL_ID).catch((err) => {
-      console.error("❌ Failed to fetch Discord channel:", err.message);
-      return null;
-    });
-  }
 
   const host = MC_SERVER_IP || "15.235.144.117";
   const port = MC_SERVER_PORT || 14902;
@@ -65,9 +56,14 @@ client.once(Events.ClientReady, async (c) => {
     console.warn("⚠️ Could not fetch initial status. Defaulting to OFFLINE state.");
   }
 
-  // Interval polling
+  // Interval polling loop
   setInterval(async () => {
     try {
+      // Safely fetch target channel on every poll cycle
+      if (!CHANNEL_ID) return;
+      const channel = await client.channels.fetch(CHANNEL_ID).catch(() => null);
+      if (!channel) return;
+
       const response = await axios.get(
         `https://api.mcstatus.io/v2/status/bedrock/${host}:${port}`
       );
@@ -78,50 +74,47 @@ client.once(Events.ClientReady, async (c) => {
         isServerOnline = true;
         console.log("🟢 Server boot detected! Sending Discord announcement...");
 
-        if (channel) {
-          const onlineNotificationEmbed = new EmbedBuilder()
-            .setColor(0x2ecc71)
-            .setTitle("Server is now ONLINE!")
-            .setDescription("The server is available for players to join.")
-            .addFields(
-              {
-                name: "🏷️ Version",
-                value: `\`${data.version?.name || "Bedrock Edition"}\``,
-                inline: true,
-              },
-              {
-                name: "👥 Players",
-                value: `\`${data.players.online} / ${data.players.max}\``,
-                inline: true,
-              }
-            )
-            .setFooter({ text: "Automated Server Status Watcher" })
-            .setTimestamp();
+        const onlineNotificationEmbed = new EmbedBuilder()
+          .setColor(0x2ecc71)
+          .setTitle("Server is now ONLINE!")
+          .setDescription("The server is available for players to join.")
+          .addFields(
+            {
+              name: "🏷️ Version",
+              value: `\`${data.version?.name || "Bedrock Edition"}\``,
+              inline: true,
+            },
+            {
+              name: "👥 Players",
+              value: `\`${data.players.online} / ${data.players.max}\``,
+              inline: true,
+            }
+          )
+          .setFooter({ text: "Automated Server Status Watcher" })
+          .setTimestamp();
 
-          // Place the role mention in the main content parameter:
-          await channel.send({
-            content: "<@&1543433357881507942>",
-            embeds: [onlineNotificationEmbed],
-          });
-        }
+        // Send role mention in message content with explicit allowedMentions
+        await channel.send({
+          content: "<@&1543433357881507942>",
+          embeds: [onlineNotificationEmbed],
+          allowedMentions: { roles: ["1543433357881507942"] },
+        });
       }
       // STATE TRANSITION: Server went OFFLINE
       else if (!data.online && isServerOnline) {
         isServerOnline = false;
         console.log("🔴 Server shutdown detected.");
 
-        if (channel) {
-          const offlineNotificationEmbed = new EmbedBuilder()
-            .setColor(0xe74c3c)
-            .setTitle("Server just went OFFLINE")
-            .setDescription(
-              "Contact any admin regarding the server status. It may be undergoing maintenance or experiencing issues."
-            )
-            .setFooter({ text: "Automated Server Status Watcher" })
-            .setTimestamp();
+        const offlineNotificationEmbed = new EmbedBuilder()
+          .setColor(0xe74c3c)
+          .setTitle("Server just went OFFLINE")
+          .setDescription(
+            "Contact any admin regarding the server status. It may be undergoing maintenance or experiencing issues."
+          )
+          .setFooter({ text: "Automated Server Status Watcher" })
+          .setTimestamp();
 
-          await channel.send({ embeds: [offlineNotificationEmbed] });
-        }
+        await channel.send({ embeds: [offlineNotificationEmbed] });
       }
     } catch (err) {
       console.error("Status watcher poll error:", err.message);
@@ -129,7 +122,7 @@ client.once(Events.ClientReady, async (c) => {
   }, CHECK_INTERVAL);
 });
 
-// 4. Interaction Handler
+// 4. Slash Command Interaction Handler
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
