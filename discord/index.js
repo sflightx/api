@@ -234,6 +234,7 @@ client.on(Events.Debug, (message) => {
     console.log(`🔍 [Discord Debug]: ${message}`);
   }
 });
+client.on("debug", (info) => console.log(`🔍 [Gateway Debug] ${info}`));
 
 client.rest.on("rateLimited", (rateLimitInfo) => {
   console.warn(
