@@ -82,7 +82,7 @@ client.once(Events.ClientReady, async (c) => {
           const onlineNotificationEmbed = new EmbedBuilder()
             .setColor(0x2ecc71)
             .setTitle("Server is now ONLINE!")
-            .setDescription("<#1543433357881507942> The server is available for players to join.")
+            .setDescription("The server is available for players to join.")
             .addFields(
               {
                 name: "🏷️ Version",
@@ -98,7 +98,11 @@ client.once(Events.ClientReady, async (c) => {
             .setFooter({ text: "Automated Server Status Watcher" })
             .setTimestamp();
 
-          await channel.send({ embeds: [onlineNotificationEmbed] });
+          // Place the role mention in the main content parameter:
+          await channel.send({
+            content: "<@&1543433357881507942>",
+            embeds: [onlineNotificationEmbed],
+          });
         }
       }
       // STATE TRANSITION: Server went OFFLINE
